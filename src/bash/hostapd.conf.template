@@ -1,0 +1,16 @@
+interface=$INTERFACE
+driver=nl80211
+ctrl_interface=/var/run/hostapd
+ctrl_interface_group=0
+ssid=$SSID
+channel=$CHANNEL
+hw_mode=g
+auth_algs=1
+ignore_broadcast_ssid=$HIDDEN
+
+# Optional security fields (WPA2 / WPA1 / Open)
+wpa=$WPA_MODE
+wpa_passphrase=$PASSPHRASE
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+wpa_pairwise=TKIP

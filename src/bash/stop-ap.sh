@@ -2,14 +2,16 @@
 # Usage:
 # ./stop-ap.sh
 
-set -e
+# Load config
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/config.sh"
 
-IFACE="wlx00c0cab4b58c"
+set -e
 
 # Stop hostapd
 echo "{+] Stopping hostapd ... "
 sudo pkill hostapd
-rm -f /tmp/watt_ap_active
+rm -f /tmp/wapt_ap_active
 
 # Stop dnsmasq
 echo "{+] Stopping dnsmasq ... "
@@ -33,13 +35,13 @@ sudo iptables -t nat -F
 echo 0 | sudo tee /proc/sys/net/ipv4/ip_forward > /dev/null
 
 # Reset Wi-Fi Interface
-echo "{+] Resetting interface $IFACE ... "
-sudo ip link set $IFACE down
-sudo ip addr flush dev $IFACE
-sudo ip link set $IFACE up
+echo "{+] Resetting interface $INTERFACE ... "
+sudo ip link set $INTERFACE down
+sudo ip addr flush dev $INTERFACE
+sudo ip link set $INTERFACE up
 
 # Reenable NetworkManager
 echo "{+] Starting NetworkManager ... "
 sudo systemctl start NetworkManager
 
-echo "{+] AP DISABLED ... "
+echo "{+] Access Point DISABLED ... "

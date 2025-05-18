@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Load environment
-source "$(dirname "${BASH_SOURCE[0]}")/fn_load-env.sh"
+# Load config
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/config.sh"
 
 # Set interface down
 bash "$SCRIPT_DIR/set-interface-down.sh"
