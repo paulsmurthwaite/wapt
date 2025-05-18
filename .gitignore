@@ -1,4 +1,4 @@
 __pycache__
 *.pcap
-backup_wapt.sh
+backup*.sh
 requirements.txt
