@@ -2,46 +2,54 @@
 # Usage:
 # ./stop-ap.sh
 
+set -e
+
 # Load config
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/config.sh"
 
-set -e
-
 # Stop hostapd
-echo "{+] Stopping hostapd ... "
-sudo pkill hostapd
+if pgrep hostapd > /dev/null; then
+    echo "[+] Stopping hostapd ..."
+    sudo pkill hostapd
+else
+    echo "[+] hostapd not running."
+fi
+
+# Remove AP status file
 rm -f /tmp/wapt_ap_active
 
 # Stop dnsmasq
-echo "{+] Stopping dnsmasq ... "
-sudo pkill dnsmasq
+if pgrep dnsmasq > /dev/null; then
+    echo "[+] Stopping dnsmasq ..."
+    sudo pkill dnsmasq
+else
+    echo "[+] dnsmasq not running."
+fi
 
 # Restore systemd-resolved
-echo "{+] Restoring systemd-resolved ... "
+echo "[+] Restoring systemd-resolved ..."
 sudo systemctl start systemd-resolved
 
 # Relink /etc/resolv.conf
-echo "{+] Relinking /etc/resolv.conf ... "
+echo "[+] Relinking /etc/resolv.conf ..."
 sudo rm -f /etc/resolv.conf
 sudo ln -s /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 
 # Flush iptables
-echo "{+] Flushing iptables ... "
+echo "[+] Flushing iptables ..."
 sudo iptables -F
 sudo iptables -t nat -F
 
-# Disable IP Forwarding
+# Disable IP forwarding
 echo 0 | sudo tee /proc/sys/net/ipv4/ip_forward > /dev/null
 
-# Reset Wi-Fi Interface
-echo "{+] Resetting interface $INTERFACE ... "
-sudo ip link set $INTERFACE down
-sudo ip addr flush dev $INTERFACE
-sudo ip link set $INTERFACE up
+# Reset Wi-Fi interface
+echo "[+] Resetting interface $INTERFACE ..."
+bash "$SCRIPT_DIR/reset-interface-soft.sh"
 
-# Reenable NetworkManager
-echo "{+] Starting NetworkManager ... "
+# Re-enable NetworkManager
+echo "[+] Starting NetworkManager ..."
 sudo systemctl start NetworkManager
 
-echo "{+] Access Point DISABLED ... "
+echo "[+] Access point shut down."

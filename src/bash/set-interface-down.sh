@@ -7,4 +7,5 @@ source "$SCRIPT_DIR/config.sh"
 # Set interface down
 echo "[INFO] Bringing interface $INTERFACE down..."
 sudo ip link set $INTERFACE down
+sudo ip addr flush dev "$INTERFACE"
 sleep 3

@@ -27,10 +27,10 @@ fi
 # Load profile variables
 source "$PROFILE_PATH"
 
-# Export for envsubst
-export INTERFACE SSID CHANNEL HIDDEN WPA_MODE PASSPHRASE
+# Export for envsubst and BSSID support
+export INTERFACE SSID CHANNEL HIDDEN WPA_MODE PASSPHRASE WPA3 BSSID
 
-# Generate hostapd.conf (remove WPA lines if unencrypted)
+# Generate hostapd.conf
 if [[ -z "$WPA_MODE" ]]; then
     echo "[INFO] Launching open AP. Skipping WPA config..."
     grep -v '^wpa=' "$SCRIPT_DIR/hostapd.conf.template" \
@@ -44,29 +44,45 @@ else
     envsubst < "$SCRIPT_DIR/hostapd.conf.template" > /tmp/hostapd.conf
 fi
 
-# Kill existing processes
-echo "[+] Stopping existing services ..."
-sudo "$SCRIPT_DIR/stop-ap.sh" || true
+# WPA3 enhancement (append SAE options if requested)
+if [[ "$WPA3" == "1" ]]; then
+    echo "[INFO] WPA3-SAE enhancements enabled"
+    {
+        echo "ieee80211w=2"
+        echo "sae_require_mfp=1"
+        echo "wpa_key_mgmt=SAE WPA-PSK"
+    } >> /tmp/hostapd.conf
+fi
+
+# Apply custom BSSID if passed
+if [[ -n "$BSSID" ]]; then
+    echo "[INFO] Applying custom BSSID: $BSSID"
+    echo "bssid=$BSSID" >> /tmp/hostapd.conf
+fi
 
 # Stop NetworkManager
 echo "[+] Stopping NetworkManager ..."
 sudo systemctl stop NetworkManager
 
-# Interface configuration
+# Configure interface
 echo "[+] Configuring interface $INTERFACE ..."
-sudo ip link set "$INTERFACE" down
-sudo ip addr flush dev "$INTERFACE"
-sudo ip addr add "$GATEWAY/24" dev "$INTERFACE"
-sudo ip link set "$INTERFACE" up
+bash "$SCRIPT_DIR/set-interface-down.sh"
+sudo ip addr add "${GATEWAY}/24" dev "$INTERFACE"
+bash "$SCRIPT_DIR/set-interface-up.sh"
 
 # Enable IP forwarding
 echo "[+] Enabling IP forwarding ..."
 echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward > /dev/null
 
-# Start hostapd
+# Launch hostapd
 echo "[+] Starting hostapd ..."
 sudo hostapd /tmp/hostapd.conf -B
-echo "$SSID" > /tmp/wapt_ap_active
+
+# NAT handling
+NAT_STATE="nonat"
+if [[ "$2" == "nat" ]]; then
+    NAT_STATE="nat"
+fi
 
 # DNS setup
 echo "[+] Stopping systemd-resolved ..."
@@ -76,13 +92,13 @@ echo "[+] Configuring resolv.conf ..."
 sudo rm -f /etc/resolv.conf
 echo "nameserver 9.9.9.9" | sudo tee /etc/resolv.conf > /dev/null
 
-# Start dnsmasq
+# Launch dnsmasq
 echo "[+] Starting dnsmasq ..."
 sudo dnsmasq -C "$SCRIPT_DIR/dnsmasq.conf"
 
 # Optional NAT support
-if [[ "$2" == "nat" ]]; then
-    echo "[+] Applying NAT and forwarding rules ..."
+if [[ "$NAT_STATE" == "nat" ]]; then
+    echo "[+] NAT enabled. Applying forwarding rules ..."
     sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o ens33 -j MASQUERADE
     sudo iptables -A FORWARD -i "$INTERFACE" -o ens33 -j ACCEPT
     sudo iptables -A FORWARD -i ens33 -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT
@@ -90,4 +106,11 @@ else
     echo "[+] NAT disabled. Internet access blocked for clients."
 fi
 
+# Final status file
+echo "$SSID|$(date +%s)|$NAT_STATE|${BSSID:-default}" > /tmp/wapt_ap_active
+
+# Inform user of launch success
 echo "[+] Access point '$SSID' is now running on $INTERFACE."
+if [[ -n "$BSSID" ]]; then
+    echo "[+] Verify BSSID assignment using: iw dev $INTERFACE info"
+fi

@@ -14,7 +14,9 @@ Module:      TM470-25B
 
 import pyfiglet
 import os
+import re
 import subprocess
+import time
 
 def get_interface_details():
     """
@@ -86,18 +88,38 @@ def print_interface_status():
     print(f"[ Interface Mode  ] {mode_colour}{mode}\033[0m")
     print()
 
-def print_service_status():
-    """Display Access Point and Attack Tool status with colour formatting."""
-    ap_file = "/tmp/wapt_ap_active"
+import time
 
+def print_service_status():
+    """Display Access Point status with time-based expiry, NAT state, and BSSID."""
+    ap_file = "/tmp/wapt_ap_active"
     ap_raw = "Stopped"
 
+    # Expiry threshold in seconds (15 minutes)
+    expiry_seconds = 900  # 15 minutes
+
     if os.path.exists(ap_file):
-        with open(ap_file, "r") as f:
-            ap_raw = f"Running ({f.read().strip()})"
+        try:
+            with open(ap_file, "r") as f:
+                content = f.read().strip()
+                parts = content.split("|")
+
+                if len(parts) >= 3:
+                    ssid = parts[0]
+                    timestamp = int(parts[1])
+                    nat_flag = parts[2]
+                    bssid = parts[3] if len(parts) > 3 else "default"
+
+                    age = time.time() - timestamp
+
+                    if age <= expiry_seconds:
+                        nat_status = "NAT" if nat_flag == "nat" else "No NAT"
+                        bssid_display = f", BSSID {bssid}" if bssid != "default" else ""
+                        ap_raw = f"Running ({ssid}, {nat_status}{bssid_display})"
+        except Exception:
+            pass  # If error ap_raw = "Stopped"
 
     ap_colour = "\033[92m" if ap_raw.startswith("Stopped") else "\033[93m"
-
     print(f"[ Access Point ] {ap_colour}{ap_raw}\033[0m")
     print()
 
@@ -138,7 +160,7 @@ def show_menu():
 
     print("\n  [0] Exit")
 
-def run_bash_script(script_name, pause=True, capture=True, title=None, args=None):
+def run_bash_script(script_name, pause=True, capture=True, title=None, args=None, clear=True):
     """
     Executes a Bash script located under /src/bash.
     
@@ -147,7 +169,8 @@ def run_bash_script(script_name, pause=True, capture=True, title=None, args=None
         args (list): List of arguments to pass to the script
         ...
     """
-    clear_screen()
+    if clear:
+        clear_screen()
 
     if title:
         print_header(title)
@@ -186,23 +209,39 @@ def run_bash_script(script_name, pause=True, capture=True, title=None, args=None
     if pause:
         input("\n[Press Enter to return to menu]")
 
+def prompt_nat():
+    """Prompt user to enable NAT."""
+    response = input("\n  [+] Enable NAT forwarding for this profile? [y/N]: ").strip().lower()
+    return ["nat"] if response == "y" else []
+
+import re
+
+def generate_bssid(profile_number: int) -> str:
+    """Generate a locally administered MAC address with profile-specific last octet."""
+    # First byte 0x02 = locally administered
+    base = [0x02, 0x00, 0x00, 0x00, 0x00, profile_number]
+    return ":".join(f"{octet:02X}" for octet in base)
+
 def ap_profiles():
     """Access Points submenu."""
 
-    def ap_open():
-        run_bash_script("start-ap", args=["ap_open"], capture=False, pause=True, title="Open Access Point")
+    def ap_open(args):
+        run_bash_script("start-ap", args=["ap_open"] + args, capture=False, pause=True, title="Open Access Point")
 
-    def ap_wpa2():
-        run_bash_script("start-ap", args=["ap_wpa2"], capture=False, pause=True, title="WPA2 Access Point")
+    def ap_wpa2(args):
+        run_bash_script("start-ap", args=["ap_wpa2"] + args, capture=False, pause=True, title="WPA2 Access Point")
 
-    def ap_hidden():
-        run_bash_script("start-ap", args=["ap_wpa2-hidden"], capture=False, pause=True, title="Hidden SSID Access Point")
+    def ap_hidden(args):
+        run_bash_script("start-ap", args=["ap_wpa2-hidden"] + args, capture=False, pause=True, title="Hidden SSID Access Point")
 
-    def ap_spoofed():
-        run_bash_script("start-ap", args=["ap_spoofed"], capture=False, pause=True, title="Spoofed SSID Access Point")
+    def ap_spoofed(args):
+        run_bash_script("start-ap", args=["ap_spoofed"] + args, capture=False, pause=True, title="Spoofed SSID Access Point")
 
-    def ap_misconfig():
-        run_bash_script("start-ap", args=["ap_misconfig"], capture=False, pause=True, title="Misconfigured Access Point")
+    def ap_misconfig(args):
+        run_bash_script("start-ap", args=["ap_misconfig"] + args, capture=False, pause=True, title="Misconfigured Access Point")
+
+    def ap_wpa3(args):
+        run_bash_script("start-ap", args=["ap_wpa3"] + args, capture=False, pause=True, title="WPA3 Access Point")
 
     def stop_ap():
         run_bash_script("stop-ap", pause=True, capture=False, title="Stop Access Point")
@@ -213,6 +252,7 @@ def ap_profiles():
         "3": ap_hidden,
         "4": ap_spoofed,
         "5": ap_misconfig,
+        "6": ap_wpa3,
         "S": stop_ap
     }
 
@@ -229,6 +269,7 @@ def ap_profiles():
         print("  [3] Launch Hidden SSID Access Point (WPA2-PSK)")
         print("  [4] Launch Spoofed SSID Access Point (OPN)")
         print("  [5] Launch Misconfigured Access Point (WPA1-TKIP)")
+        print("  [6] Launch WPA3 Access Point (WPA3-SAE)")
 
         print("\n  [S] Stop Access Point")
 
@@ -239,10 +280,39 @@ def ap_profiles():
         if choice == "0":
             break
 
-        action = actions.get(choice)
-        if action:
-            clear_screen()
-            action()
+        if choice in actions:
+            if choice in {"1", "2", "3", "4", "5", "6"}:
+                if os.path.exists("/tmp/wapt_ap_active"):
+                    print("\n\033[91m  [!] An access point is already running.\033[0m")
+                    input("\n[Press Enter to return to menu]")
+                    continue  # Return to submenu without prompting for NAT
+
+                # NAT prompt
+                nat_args = prompt_nat()
+
+                # BSSID prompt
+                use_bssid = input("  [+] Use a custom (locally administered) BSSID? [y/N]: ").strip().lower()
+                if use_bssid == "y":
+                    profile_map = {
+                        "1": 1,
+                        "2": 2,
+                        "3": 3,
+                        "4": 4,
+                        "5": 5,
+                        "6": 6
+                    }
+                    profile_number = profile_map.get(choice, 0)
+                    generated_bssid = generate_bssid(profile_number)
+                    print(f"  [✓] Using generated BSSID: {generated_bssid}")
+                    os.environ["BSSID"] = generated_bssid
+                else:
+                    os.environ.pop("BSSID", None)
+
+                actions[choice](nat_args)  # Call AP launcher with args
+
+            else:
+                clear_screen()
+                actions[choice]()  # Stop AP or other non-arg actions
         else:
             pause_on_invalid()
 
@@ -429,8 +499,13 @@ def main():
         elif choice == "3":
             help_about()
         elif choice == "0":
+            if os.path.exists("/tmp/wapt_ap_active"):
+                print("\n[!] An access point is still running. Shutting it down...")
+                run_bash_script("stop-ap", pause=False, capture=False, clear=False)
+
             print("\nExiting to shell.")
             break
+
         else:
             pause_on_invalid()
 
