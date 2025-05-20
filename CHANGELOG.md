@@ -2,6 +2,20 @@
 
 All notable changes to the Wireless Access Point Toolkit (WAPT) will be documented in this file.
 
+## [v1.0.1] – 2025-05-20
+
+### Changed
+- Reworked start-ap.sh to always report the actual runtime BSSID, using iw dev for accuracy
+- Reset wireless interface MAC address to factory default in set-interface-down.sh (unless custom BSSID is applied)
+- Improved BSSID messaging in wapt.py to direct users to the Service Status panel
+- Expanded help_about() content with clearer description of toolkit functions
+- Corrected menu label typo in WPA2 access point entry
+- Updated exit message formatting and script failure output to match symbol-based UI style
+
+### UI
+- Finalised standardised output format using [+], [x], [>], [!], etc. across all Bash scripts
+- Applied consistent UI presentation across all screens: ASCII banner, headers, subtitle, menu, input
+
 ## [v1.0.0] – 2025-05-19
 
 ### Added
