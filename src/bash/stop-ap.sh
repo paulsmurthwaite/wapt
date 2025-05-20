@@ -1,10 +1,10 @@
 #!/bin/bash
-# Usage:
-# ./stop-ap.sh
+# Utility: Stops any running access point launched from WAPT
+# Usage: # ./stop-ap.sh
 
 set -e
 
-# Load config
+# Load helpers
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/config.sh"
 source "$SCRIPT_DIR/print.sh"

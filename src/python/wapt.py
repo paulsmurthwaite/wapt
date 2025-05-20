@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""watt.py
+"""wapt.py
 
-Main entry point for the Wireless Attack Testing Toolkit (WATT) menu interface.
+Main entry point for the Wireless Access Point Toolkit (WAPT) menu interface.
 
 This script provides a simple, operator-friendly CLI for accessing key toolkit functions such as scanning, capturing, and detection.  It is designed to offer a clear and low-complexity user experience, suitable for field use in SME environments.
 
@@ -254,7 +254,7 @@ def run_bash_script(script_name, pause=True, capture=True, title=None, args=None
     )
 
     if not os.path.exists(script_path):
-        print(f"[!] Script not found: {script_name}.sh")
+        print(f"[x] Script not found: {script_name}.sh")
         return
 
     cmd = ["bash", script_path]
@@ -285,7 +285,7 @@ def prompt_nat():
     """
     Prompt user to enable NAT.
     """
-    response = input("\n[+] Enable NAT forwarding for this profile? [y/N]: ").strip().lower()
+    response = input("\n[?] Enable NAT forwarding for this profile? [y/N]: ").strip().lower()
     return ["nat"] if response == "y" else []
 
 def generate_bssid(profile_number: int) -> str:
@@ -348,7 +348,7 @@ def ap_profiles():
         print("\n[0] Return to Main Menu")
 
         # Input
-        choice = input("\n[+] Select an option: ").strip().upper()
+        choice = input("\n[?] Select an option: ").strip().upper()
 
         if choice == "0":
             break
@@ -364,7 +364,7 @@ def ap_profiles():
                 nat_args = prompt_nat()
 
                 # BSSID prompt
-                use_bssid = input("[+] Use a custom (locally administered) BSSID? [y/N]: ").strip().lower()
+                use_bssid = input("[?] Use a custom (locally administered) BSSID? [y/N]: ").strip().lower()
                 if use_bssid == "y":
                     profile_map = {
                         "1": 1,
@@ -424,7 +424,7 @@ def service_control():
             print("\n[0] Return to Service Control Menu")
 
             # Input
-            choice = input("\n[+] Select an option: ")
+            choice = input("\n[?] Select an option: ")
 
             if choice == "0":
                 break
@@ -464,7 +464,7 @@ def service_control():
             print("\n[0] Return to Service Control Menu")
 
             # Input
-            choice = input("\n[+] Select an option: ")
+            choice = input("\n[?] Select an option: ")
 
             if choice == "0":
                 break
@@ -504,7 +504,7 @@ def service_control():
             print("\n[0] Return to Service Control Menu")
 
             # Input
-            choice = input("\n[+] Select an option: ")
+            choice = input("\n[?] Select an option: ")
 
             if choice == "0":
                 break
@@ -535,7 +535,7 @@ def service_control():
         print("\n[0] Return to Main Menu")
 
         # Input
-        choice = input("\n[+] Select an option: ")
+        choice = input("\n[?] Select an option: ")
 
         if choice == "0":
             break
@@ -551,7 +551,6 @@ def help_about():
     """
     Help | About submenu.
     """
-
     ui_clear_screen()
 
     # Header block
@@ -580,10 +579,9 @@ def main():
     """
     User input handler.
     """
-
     while True:
         show_menu()
-        choice = input("\n[+] Select an option: ")
+        choice = input("\n[?] Select an option: ")
         
         if choice == "1":
             ap_profiles()

@@ -2,6 +2,10 @@
 #
 # Standardised Output Formatting
 
+print_blank() {
+    echo ""
+}
+
 print_info() {
     echo "[*] $1"
 }
