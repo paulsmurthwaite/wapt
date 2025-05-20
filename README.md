@@ -6,10 +6,13 @@ WAPT is a modular command-line toolkit for deploying standalone wireless access 
 
 - Profile-based access point deployment using Bash and Python
 - Optional NAT forwarding for client internet access
-- Custom BSSID assignment using locally administered MACs
+- Optional custom BSSID assignment using locally administered MACs
+- Displays active BSSID in Service Status panel (default or custom)
 - Automatic status tracking and time-based expiry of active AP flags
 - Clean service shutdown and interface state restoration
 - Menu-driven interface with clear operator prompts and validation
+- Symbol-based CLI output format for clear operator feedback
+- Standardised menu layout with persistent interface/service status display
 
 ## Repository Structure
 
@@ -18,6 +21,8 @@ The key files and directories are as follows:
 ```
 /src/
 ├── bash/
+│   ├── config.sh
+│   ├── print.sh
 │   ├── start-ap.sh
 │   ├── stop-ap.sh
 │   ├── set-interface-down.sh
@@ -52,7 +57,7 @@ When launching a profile, the user is prompted to:
 1. Enable or disable NAT forwarding
 2. Use a custom BSSID (auto-generated if enabled)
 
-Once launched, the access point runs on the configured wireless interface and is monitored via `/tmp/wapt_ap_active`.
+Once launched, the access point runs on the configured wireless interface. Runtime status (SSID, NAT, BSSID) is shown in the Service Status panel and stored in `/tmp/wapt_ap_active`.
 
 ## Access Point Profiles
 
