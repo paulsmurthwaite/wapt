@@ -10,17 +10,18 @@ set -e
 # Resolve base directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/config.sh"
+source "$SCRIPT_DIR/print.sh"
 
 # Validate arguments
 PROFILE="$1"
 if [[ -z "$PROFILE" ]]; then
-    echo "[ERROR] No profile specified. Usage: ./start-ap.sh <profile> [nat]"
+    print_fail "No profile specified. Usage: ./start-ap.sh <profile> [nat]"
     exit 1
 fi
 
 PROFILE_PATH="$SCRIPT_DIR/ap-profiles/${PROFILE}.cfg"
 if [[ ! -f "$PROFILE_PATH" ]]; then
-    echo "[ERROR] Profile config '$PROFILE_PATH' not found."
+    print_fail "Profile config '$PROFILE_PATH' not found"
     exit 1
 fi
 
@@ -32,7 +33,7 @@ export INTERFACE SSID CHANNEL HIDDEN WPA_MODE PASSPHRASE WPA3 BSSID
 
 # Generate hostapd.conf
 if [[ -z "$WPA_MODE" ]]; then
-    echo "[INFO] Launching open AP. Skipping WPA config..."
+    print_action "Launching unencrypted AP - skipping WPA config"
     grep -v '^wpa=' "$SCRIPT_DIR/hostapd.conf.template" \
     | grep -v '^wpa_passphrase=' \
     | grep -v '^wpa_key_mgmt=' \
@@ -40,13 +41,13 @@ if [[ -z "$WPA_MODE" ]]; then
     | grep -v '^wpa_pairwise=' \
     | envsubst > /tmp/hostapd.conf
 else
-    echo "[INFO] Launching secured AP. Applying WPA config..."
+    print_action "Launching encrypted AP - applying WPA config"
     envsubst < "$SCRIPT_DIR/hostapd.conf.template" > /tmp/hostapd.conf
 fi
 
 # WPA3 enhancement (append SAE options if requested)
 if [[ "$WPA3" == "1" ]]; then
-    echo "[INFO] WPA3-SAE enhancements enabled"
+    print_action "WPA3 - SAE enhancements enabled"
     {
         echo "ieee80211w=2"
         echo "sae_require_mfp=1"
@@ -56,26 +57,26 @@ fi
 
 # Apply custom BSSID if passed
 if [[ -n "$BSSID" ]]; then
-    echo "[INFO] Applying custom BSSID: $BSSID"
+    print_action "Applying custom BSSID: $BSSID"
     echo "bssid=$BSSID" >> /tmp/hostapd.conf
 fi
 
 # Stop NetworkManager
-echo "[+] Stopping NetworkManager ..."
+print_action "Stopping NetworkManager"
 sudo systemctl stop NetworkManager
 
 # Configure interface
-echo "[+] Configuring interface $INTERFACE ..."
+print_action "Configuring interface $INTERFACE"
 bash "$SCRIPT_DIR/set-interface-down.sh"
 sudo ip addr add "${GATEWAY}/24" dev "$INTERFACE"
 bash "$SCRIPT_DIR/set-interface-up.sh"
 
 # Enable IP forwarding
-echo "[+] Enabling IP forwarding ..."
+print_action "Enabling IP forwarding"
 echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward > /dev/null
 
 # Launch hostapd
-echo "[+] Starting hostapd ..."
+print_action "Starting hostapd"
 sudo hostapd /tmp/hostapd.conf -B
 
 # NAT handling
@@ -85,32 +86,35 @@ if [[ "$2" == "nat" ]]; then
 fi
 
 # DNS setup
-echo "[+] Stopping systemd-resolved ..."
+print_action "Stopping systemd-resolved"
 sudo systemctl stop systemd-resolved
 
-echo "[+] Configuring resolv.conf ..."
+print_action "Configuring resolv.conf"
 sudo rm -f /etc/resolv.conf
 echo "nameserver 9.9.9.9" | sudo tee /etc/resolv.conf > /dev/null
 
 # Launch dnsmasq
-echo "[+] Starting dnsmasq ..."
+print_action "Starting dnsmasq"
 sudo dnsmasq -C "$SCRIPT_DIR/dnsmasq.conf"
 
 # Optional NAT support
 if [[ "$NAT_STATE" == "nat" ]]; then
-    echo "[+] NAT enabled. Applying forwarding rules ..."
+    print_action "NAT enabled - client Internet access AVAILABLE"
     sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o ens33 -j MASQUERADE
     sudo iptables -A FORWARD -i "$INTERFACE" -o ens33 -j ACCEPT
     sudo iptables -A FORWARD -i ens33 -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT
 else
-    echo "[+] NAT disabled. Internet access blocked for clients."
+    print_warn "NAT disabled - client Internet access BLOCKED"
 fi
 
-# Final status file
-echo "$SSID|$(date +%s)|$NAT_STATE|${BSSID:-default}" > /tmp/wapt_ap_active
+# Retrieve BSSID from hostapd
+ACTUAL_BSSID=$(iw dev "$INTERFACE" info | awk '/addr/ {print toupper($2)}')
+
+# Write AP status to file
+echo "$SSID|$(date +%s)|$NAT_STATE|$ACTUAL_BSSID" > /tmp/wapt_ap_active
 
 # Inform user of launch success
-echo "[+] Access point '$SSID' is now running on $INTERFACE."
+print_success "Access point '$SSID' is now running on $INTERFACE"
 if [[ -n "$BSSID" ]]; then
-    echo "[+] Verify BSSID assignment using: iw dev $INTERFACE info"
+    print_info "Custom BSSID applied - view details in the Service Status panel"
 fi

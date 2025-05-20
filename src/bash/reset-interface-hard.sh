@@ -3,15 +3,16 @@
 # Load config
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/config.sh"
+source "$SCRIPT_DIR/print.sh"
 
-# Read interface driver
+# Read driver
 DRIVER=$(basename "$(readlink /sys/class/net/$INTERFACE/device/driver)")
 
-# Remove interface driver
-echo "[INFO] Unloading interface $INTERFACE driver $DRIVER ..."
+# Unload
+print_action "Interface hard reset (Unload $DRIVER)"
 sudo rmmod $DRIVER
 
-# Reload interface driver
-echo "[INFO] Reloading interface $INTERFACE ..."
+# Reload
+print_action "Interface hard reset (Reload $DRIVER)"
 sudo modprobe $DRIVER
 sleep 5
