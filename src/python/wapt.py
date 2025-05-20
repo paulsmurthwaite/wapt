@@ -232,7 +232,9 @@ def show_menu():
     # Exit option
     print("\n[0] Exit")
 
-def run_bash_script(script_name, pause=True, capture=True, title=None, args=None, clear=True):
+# ─── Bash Script Handler ───
+#
+def run_bash_script(script_name, pause=True, capture=True, args=None, clear=True, title=None):
     """
     Executes a Bash script located under /src/bash.
     

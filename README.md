@@ -1,4 +1,4 @@
-# WAPT – Wireless Access Point Toolkit
+# Wireless Access Point Toolkit (WAPT)
 
 WAPT is a modular command-line toolkit for deploying standalone wireless access points for security testing and demonstration. It supports a range of profiles including open, WPA2, WPA3, hidden, spoofed, and misconfigured access points. The toolkit is structured for reliability, maintainability, and ease of use in SME or lab environments.
 
