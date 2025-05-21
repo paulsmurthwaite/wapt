@@ -100,9 +100,9 @@ sudo dnsmasq -C "$SCRIPT_DIR/dnsmasq.conf"
 # Optional NAT support
 if [[ "$NAT_STATE" == "nat" ]]; then
     print_action "NAT enabled - client Internet access AVAILABLE"
-    sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o ens33 -j MASQUERADE
-    sudo iptables -A FORWARD -i "$INTERFACE" -o ens33 -j ACCEPT
-    sudo iptables -A FORWARD -i ens33 -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT
+    sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o enp0s25 -j MASQUERADE
+    sudo iptables -A FORWARD -i "$INTERFACE" -o enp0s25 -j ACCEPT
+    sudo iptables -A FORWARD -i enp0s25 -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT
 else
     print_warn "NAT disabled - client Internet access BLOCKED"
 fi
