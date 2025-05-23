@@ -222,11 +222,12 @@ def show_menu():
     ui_standard_header("Main Menu")
 
     # Menu block
-    ui_header("Standalone Tools")
+    ui_header("Utilities")
     print("[1] Access Points")
     print()
-    ui_header("Utilities")
+    ui_header("Services")
     print("[2] Service Control")
+    print()
     print("[3] Help | About")
 
     # Exit option
@@ -303,25 +304,25 @@ def ap_profiles():
     Access Points submenu.
     """
     def ap_open(args):
-        run_bash_script("utilities/start-ap", args=["ap_open"] + args, capture=False, pause=True, clear=False, title="Open Access Point")
+        run_bash_script("utilities/start-ap", args=["ap_open"] + args, capture=False, pause=False, clear=False, title="Open Access Point")
 
     def ap_wpa2(args):
-        run_bash_script("utilities/start-ap", args=["ap_wpa2"] + args, capture=False, pause=True, clear=False, title="WPA2 Access Point")
+        run_bash_script("utilities/start-ap", args=["ap_wpa2"] + args, capture=False, pause=False, clear=False, title="WPA2 Access Point")
 
     def ap_hidden(args):
-        run_bash_script("utilities/start-ap", args=["ap_wpa2-hidden"] + args, capture=False, pause=True, clear=False, title="Hidden SSID Access Point")
+        run_bash_script("utilities/start-ap", args=["ap_wpa2-hidden"] + args, capture=False, pause=False, clear=False, title="Hidden SSID Access Point")
 
     def ap_spoofed(args):
-        run_bash_script("utilities/start-ap", args=["ap_spoofed"] + args, capture=False, pause=True, clear=False, title="Spoofed SSID Access Point")
+        run_bash_script("utilities/start-ap", args=["ap_spoofed"] + args, capture=False, pause=False, clear=False, title="Spoofed SSID Access Point")
 
     def ap_misconfig(args):
-        run_bash_script("utilities/start-ap", args=["ap_misconfig"] + args, capture=False, pause=True, clear=False, title="Misconfigured Access Point")
+        run_bash_script("utilities/start-ap", args=["ap_misconfig"] + args, capture=False, pause=False, clear=False, title="Misconfigured Access Point")
 
     def ap_wpa3(args):
-        run_bash_script("utilities/start-ap", args=["ap_wpa3"] + args, capture=False, pause=True, clear=False, title="WPA3 Access Point")
+        run_bash_script("utilities/start-ap", args=["ap_wpa3"] + args, capture=False, pause=False, clear=False, title="WPA3 Access Point")
 
     def stop_ap():
-        run_bash_script("utilities/stop-ap", pause=True, capture=False, clear=False, title="Stop Access Point")
+        run_bash_script("utilities/stop-ap", pause=False, capture=False, clear=False, title="Stop Access Point")
 
     actions = {
         "1": ap_open,
