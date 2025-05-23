@@ -1,9 +1,9 @@
 #!/bin/bash
-#
-# Standardised Output Formatting
 
-print_blank() {
-    echo ""
+# ─── Standardise Output Formatting ───
+
+print_section() {
+    echo -e "\033[1m[ $1 ]\033[0m"
 }
 
 print_info() {
@@ -32,4 +32,12 @@ print_waiting() {
 
 print_prompt() {
     echo -n "[?] $1"
+}
+
+print_none() {
+    echo "$1"
+}
+
+print_blank() {
+    echo ""
 }

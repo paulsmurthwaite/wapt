@@ -7,10 +7,18 @@
 
 set -e
 
-# Resolve base directories
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/config.sh"
-source "$SCRIPT_DIR/print.sh"
+# ─── Paths ───
+BASH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CONFIG_DIR="$BASH_DIR/config"
+HELPERS_DIR="$BASH_DIR/helpers"
+UTILITIES_DIR="$BASH_DIR/utilities"
+SERVICES_DIR="$BASH_DIR/services"
+
+# ─── Configs ───
+source "$CONFIG_DIR/global.conf"
+
+# ─── Helpers ───
+source "$HELPERS_DIR/fn_print.sh"
 
 # Validate arguments
 PROFILE="$1"
@@ -19,7 +27,7 @@ if [[ -z "$PROFILE" ]]; then
     exit 1
 fi
 
-PROFILE_PATH="$SCRIPT_DIR/ap-profiles/${PROFILE}.cfg"
+PROFILE_PATH="$CONFIG_DIR/${PROFILE}.cfg"
 if [[ ! -f "$PROFILE_PATH" ]]; then
     print_fail "Profile config '$PROFILE_PATH' not found"
     exit 1
@@ -34,7 +42,7 @@ export INTERFACE SSID CHANNEL HIDDEN WPA_MODE PASSPHRASE WPA3 BSSID
 # Generate hostapd.conf
 if [[ -z "$WPA_MODE" ]]; then
     print_action "Launching unencrypted AP - skipping WPA config"
-    grep -v '^wpa=' "$SCRIPT_DIR/hostapd.conf.template" \
+    grep -v '^wpa=' "$CONFIG_DIR/hostapd.conf.template" \
     | grep -v '^wpa_passphrase=' \
     | grep -v '^wpa_key_mgmt=' \
     | grep -v '^rsn_pairwise=' \
@@ -42,7 +50,7 @@ if [[ -z "$WPA_MODE" ]]; then
     | envsubst > /tmp/hostapd.conf
 else
     print_action "Launching encrypted AP - applying WPA config"
-    envsubst < "$SCRIPT_DIR/hostapd.conf.template" > /tmp/hostapd.conf
+    envsubst < "$CONFIG_DIR/hostapd.conf.template" > /tmp/hostapd.conf
 fi
 
 # WPA3 enhancement (append SAE options if requested)
@@ -67,9 +75,9 @@ sudo systemctl stop NetworkManager
 
 # Configure interface
 print_action "Configuring interface $INTERFACE"
-bash "$SCRIPT_DIR/set-interface-down.sh"
+bash "$SERVICES_DIR/set-interface-down.sh"
 sudo ip addr add "${GATEWAY}/24" dev "$INTERFACE"
-bash "$SCRIPT_DIR/set-interface-up.sh"
+bash "$SERVICES_DIR/set-interface-up.sh"
 
 # Enable IP forwarding
 print_action "Enabling IP forwarding"
@@ -95,14 +103,14 @@ echo "nameserver 9.9.9.9" | sudo tee /etc/resolv.conf > /dev/null
 
 # Launch dnsmasq
 print_action "Starting dnsmasq"
-sudo dnsmasq -C "$SCRIPT_DIR/dnsmasq.conf"
+sudo dnsmasq -C "$CONFIG_DIR/dnsmasq.conf"
 
 # Optional NAT support
 if [[ "$NAT_STATE" == "nat" ]]; then
     print_action "NAT enabled - client Internet access AVAILABLE"
-    sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o enp0s25 -j MASQUERADE
-    sudo iptables -A FORWARD -i "$INTERFACE" -o enp0s25 -j ACCEPT
-    sudo iptables -A FORWARD -i enp0s25 -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT
+    sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o $FWD_INTERFACE -j MASQUERADE
+    sudo iptables -A FORWARD -i "$INTERFACE" -o $FWD_INTERFACE -j ACCEPT
+    sudo iptables -A FORWARD -i $FWD_INTERFACE -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT
 else
     print_warn "NAT disabled - client Internet access BLOCKED"
 fi
