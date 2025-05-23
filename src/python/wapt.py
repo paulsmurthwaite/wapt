@@ -399,6 +399,12 @@ def service_control():
     Service Control menu.
     """
 
+    def show_dhcp_leases():
+        run_bash_script("services/show-ap-dhcp", pause=True, capture=True, clear=False, title="DHCP Lease Table")
+
+    def show_connected_stations():
+        run_bash_script("services/show-ap-stations", pause=True, capture=True, clear=False, title="Connected Stations")
+
     def interface_state():
         """
         Interface State submenu.
@@ -522,7 +528,9 @@ def service_control():
     actions = {
         "1": interface_state,
         "2": interface_mode,
-        "3": interface_reset
+        "3": interface_reset,
+        "4": show_dhcp_leases,
+        "5": show_connected_stations
     }
 
     while True:
@@ -535,6 +543,8 @@ def service_control():
         print("[1] Interface State")
         print("[2] Interface Mode")
         print("[3] Reset Interface")
+        print("[4] Show DHCP Leases")
+        print("[5] Show Connected Stations")
         print("\n[0] Return to Main Menu")
 
         # Input
