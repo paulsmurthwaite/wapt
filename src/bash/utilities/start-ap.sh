@@ -19,6 +19,7 @@ source "$CONFIG_DIR/global.conf"
 
 # ─── Helpers ───
 source "$HELPERS_DIR/fn_print.sh"
+source "$HELPERS_DIR/fn_services.sh"
 
 # ─── Validate arguments ───
 PROFILE="$1"
@@ -92,16 +93,10 @@ if [[ "$2" == "nat" ]]; then
     NAT_STATE="nat"
 fi
 
-# ─── DNS ───
-print_action "Stopping systemd-resolved"
-sudo systemctl stop systemd-resolved
-print_action "Configuring resolv.conf"
-sudo rm -f /etc/resolv.conf
-echo "nameserver 9.9.9.9" | sudo tee /etc/resolv.conf > /dev/null
-
-# ─── Launch dnsmasq ───
-print_action "Starting dnsmasq"
-sudo dnsmasq -C "$CONFIG_DIR/dnsmasq.conf"
+# ─── Start Local Services ───
+start_dns_service
+start_ntp_service
+start_http_server
 
 # ─── Apply NAT rules ───
 if [[ "$NAT_STATE" == "nat" ]]; then

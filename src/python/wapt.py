@@ -356,7 +356,7 @@ def ap_profiles():
         run_bash_script("utilities/start-ap", args=["ap_open"] + args, capture=False, pause=False, clear=False, title="Open Access Point")
 
     def ap_wpa2(args):
-        run_bash_script("utilities/start-ap", args=["ap_wpa2"] + args, capture=False, pause=False, clear=False, title="WPA2 Access Point")
+        run_bash_script("utilities/start-ap", args=["ap_wpa2"] + args, capture=False, pause=True, clear=False, title="WPA2 Access Point")
 
     def ap_hidden(args):
         run_bash_script("utilities/start-ap", args=["ap_wpa2-hidden"] + args, capture=False, pause=False, clear=False, title="Hidden SSID Access Point")
@@ -371,7 +371,7 @@ def ap_profiles():
         run_bash_script("utilities/start-ap", args=["ap_wpa3"] + args, capture=False, pause=False, clear=False, title="WPA3 Access Point")
 
     def stop_ap():
-        run_bash_script("utilities/stop-ap", pause=False, capture=False, clear=False, title="Stop Access Point")
+        run_bash_script("utilities/stop-ap", pause=True, capture=False, clear=False, title="Stop Access Point")
 
     actions = {
         "1": ap_open,

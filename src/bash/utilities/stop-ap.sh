@@ -16,6 +16,7 @@ source "$CONFIG_DIR/global.conf"
 
 # ─── Helpers ───
 source "$HELPERS_DIR/fn_print.sh"
+source "$HELPERS_DIR/fn_services.sh"
 
 # Stop hostapd
 if pgrep hostapd > /dev/null; then
@@ -28,22 +29,10 @@ fi
 # Remove AP status file
 rm -f /tmp/wapt_ap_active
 
-# Stop dnsmasq
-if pgrep dnsmasq > /dev/null; then
-    print_action "Stopping dnsmasq"
-    sudo pkill dnsmasq
-else
-    print_warn "dnsmasq not running"
-fi
-
-# Restore systemd-resolved
-print_action "Restoring systemd-resolved"
-sudo systemctl start systemd-resolved
-
-# Relink /etc/resolv.conf
-print_action "Relinking /etc/resolv.conf"
-sudo rm -f /etc/resolv.conf
-sudo ln -s /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+# ─── Stop Local Services ───
+stop_dns_service
+stop_ntp_service
+stop_http_server
 
 # Flush iptables
 print_action "Flushing iptables"
