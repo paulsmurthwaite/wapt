@@ -20,29 +20,32 @@ The key files and directories are as follows:
 ```
 /src/
 ├── bash/
-│   ├── config.sh
-│   ├── start-ap.sh
-│   ├── stop-ap.sh
-│   ├── set-interface-up.sh
-│   ├── set-interface-down.sh
-│   ├── fn_print.sh
-│   ├── fn_services.sh
-│   ├── hostapd.conf.template
-│   ├── dnsmasq.conf
-│   └── ap-profiles/
-│       ├── ap_t001.cfg
-│       ├── ap_t003_1.cfg
-│       ├── ap_t003_2.cfg
-│       ├── ap_t003_3.cfg
-│       ├── ap_t003_4.cfg
-│       ├── ap_t004.cfg
-│       ├── ap_t005.cfg
-│       ├── ap_t006.cfg
-│       ├── ap_t007.cfg
-│       ├── ap_t009.cfg
-│       ├── ap_t014.cfg
-│       ├── ap_t015.cfg
-│       └── ap_t016.cfg
+│   ├── config/
+│   │   ├── config.sh
+│   │   ├── hostapd.conf.template
+│   │   ├── dnsmasq.conf
+│   │   ├── ap_t001.cfg
+│   │   ├── ap_t003_1.cfg
+│   │   ├── ap_t003_2.cfg
+│   │   ├── ap_t003_3.cfg
+│   │   ├── ap_t003_4.cfg
+│   │   ├── ap_t004.cfg
+│   │   ├── ap_t005.cfg
+│   │   ├── ap_t006.cfg
+│   │   ├── ap_t007.cfg
+│   │   ├── ap_t009.cfg
+│   │   ├── ap_t014.cfg
+│   │   ├── ap_t015.cfg
+│   │   └── ap_t016.cfg
+│   ├── helpers/
+│   │   ├── fn_print.sh
+│   │   ├── fn_services.sh
+│   ├── services/
+│   │   ├── set-interface-up.sh
+│   │   ├── set-interface-down.sh
+│   ├── utilities/
+│   │   ├── start-ap.sh
+│   │   ├── stop-ap.sh
 ├── python/
 │   └── wapt.py
 ```
