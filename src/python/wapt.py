@@ -187,7 +187,7 @@ def print_service_status():
     """
     Display Access Point status with time-based expiry, NAT state, and BSSID.
     """
-    ap_file = "/tmp/wapt_ap_active"
+    ap_file = "/tmp/ap_active"
     ap_raw = "Stopped"
 
     # Expiry threshold
@@ -199,18 +199,17 @@ def print_service_status():
                 content = f.read().strip()
                 parts = content.split("|")
 
-                if len(parts) >= 3:
-                    ssid = parts[0]
-                    timestamp = int(parts[1])
-                    nat_flag = parts[2]
-                    bssid = parts[3] if len(parts) > 3 else "default"
+                if len(parts) >= 4:
+                    timestamp = int(parts[0])
+                    ssid = parts[1]
+                    bssid = parts[2]
+                    channel = parts[3]
 
                     age = time.time() - timestamp
 
                     if age <= expiry_seconds:
-                        nat_status = "NAT" if nat_flag == "nat" else "No NAT"
-                        bssid_display = f", BSSID {bssid}" if bssid != "default" else ""
-                        ap_raw = f"Running ({ssid}, {nat_status}{bssid_display})"
+                        start_time = time.strftime("%H:%M:%S", time.localtime(timestamp))
+                        ap_raw = f"Running ({start_time}, {ssid}, CH {channel}, BSSID {bssid})"
         except Exception:
             pass  # Keep ap_raw as "Stopped"
 
@@ -352,34 +351,62 @@ def ap_profiles():
     """
     Access Points submenu.
     """
-    def ap_open(args):
-        run_bash_script("utilities/start-ap", args=["ap_open"] + args, capture=False, pause=False, clear=False, title="Open Access Point")
+    def ap_t001(_):
+        run_bash_script("utilities/start-ap", args=["ap_t001", "nat"], capture=False, pause=False, clear=False, title="T001: Open")
 
-    def ap_wpa2(args):
-        run_bash_script("utilities/start-ap", args=["ap_wpa2"] + args, capture=False, pause=True, clear=False, title="WPA2 Access Point")
+    def ap_t003_1(_):
+        run_bash_script("utilities/start-ap", args=["ap_t003_1", "nat"], capture=False, pause=True, clear=False, title="T003: Open")
 
-    def ap_hidden(args):
-        run_bash_script("utilities/start-ap", args=["ap_wpa2-hidden"] + args, capture=False, pause=False, clear=False, title="Hidden SSID Access Point")
+    def ap_t003_2(_):
+        run_bash_script("utilities/start-ap", args=["ap_t003_2", "nat"], capture=False, pause=True, clear=False, title="T003: WPA2")
 
-    def ap_spoofed(args):
-        run_bash_script("utilities/start-ap", args=["ap_spoofed"] + args, capture=False, pause=False, clear=False, title="Spoofed SSID Access Point")
+    def ap_t003_3(_):
+        run_bash_script("utilities/start-ap", args=["ap_t003_3", "nat"], capture=False, pause=True, clear=False, title="T003: WPA2 Hidden SSID")
 
-    def ap_misconfig(args):
-        run_bash_script("utilities/start-ap", args=["ap_misconfig"] + args, capture=False, pause=False, clear=False, title="Misconfigured Access Point")
+    def ap_t003_4(_):
+        run_bash_script("utilities/start-ap", args=["ap_t003_4", "nat"], capture=False, pause=True, clear=False, title="T003: Misconfigured")
 
-    def ap_wpa3(args):
-        run_bash_script("utilities/start-ap", args=["ap_wpa3"] + args, capture=False, pause=False, clear=False, title="WPA3 Access Point")
+    def ap_t004(_):
+        run_bash_script("utilities/start-ap", args=["ap_t004", "nat"], capture=False, pause=False, clear=False, title="T004: WPA2")
+
+    def ap_t005(_):
+        run_bash_script("utilities/start-ap", args=["ap_t005", "nat"], capture=False, pause=False, clear=False, title="T005: WPA2")
+
+    def ap_t006(_):
+        run_bash_script("utilities/start-ap", args=["ap_t006", "nat"], capture=False, pause=False, clear=False, title="T006: Misconfigured")
+
+    def ap_t007(_):
+        run_bash_script("utilities/start-ap", args=["ap_t007", "nat"], capture=False, pause=False, clear=False, title="T007: WPA2")
+
+    def ap_t009(_):
+        run_bash_script("utilities/start-ap", args=["ap_t009", "nat"], capture=False, pause=False, clear=False, title="T009: WPA2")
+
+    def ap_t014(_):
+        run_bash_script("utilities/start-ap", args=["ap_t014", "nat"], capture=False, pause=False, clear=False, title="T014: Open")
+
+    def ap_t015(_):
+        run_bash_script("utilities/start-ap", args=["ap_t015", "nat"], capture=False, pause=False, clear=False, title="T015: Open")
+
+    def ap_t016(_):
+        run_bash_script("utilities/start-ap", args=["ap_t016", "nat"], capture=False, pause=False, clear=False, title="T016: Open")
 
     def stop_ap():
         run_bash_script("utilities/stop-ap", pause=True, capture=False, clear=False, title="Stop Access Point")
 
     actions = {
-        "1": ap_open,
-        "2": ap_wpa2,
-        "3": ap_hidden,
-        "4": ap_spoofed,
-        "5": ap_misconfig,
-        "6": ap_wpa3,
+        "1": ap_t001,
+        "2": ap_t003_1,
+        "3": ap_t003_2,
+        "4": ap_t003_3,
+        "5": ap_t003_4,
+        "6": ap_t004,
+        "7": ap_t005,
+        "8": ap_t006,
+        "9": ap_t007,
+        "10": ap_t009,
+        "11": ap_t014,
+        "12": ap_t015,
+        "13": ap_t016,
         "S": stop_ap
     }
 
@@ -390,12 +417,19 @@ def ap_profiles():
         ui_standard_header("Standalone Access Point Profiles")
 
         # Menu block
-        print("[1] Launch OPN Access Point (Unencrypted)")
-        print("[2] Launch WPA2 Personal Access Point (WPA2-PSK)")
-        print("[3] Launch Hidden SSID Access Point (WPA2-PSK)")
-        print("[4] Launch Spoofed SSID Access Point (OPN)")
-        print("[5] Launch Misconfigured Access Point (WPA1-TKIP)")
-        print("[6] Launch WPA3 Access Point (WPA3-SAE)")
+        print("[1] Launch T001: Open")
+        print("[2] Launch T003: Open")
+        print("[3] Launch T003: WPA2")
+        print("[4] Launch T003: WPA2 Hidden SSID")
+        print("[5] Launch T003: Misconfigured")
+        print("[6] Launch T004: WPA2")
+        print("[7] Launch T005: WPA2")
+        print("[8] Launch T006: Misconfigured")
+        print("[9] Launch T007: WPA2")
+        print("[10] Launch T009: WPA2")
+        print("[11] Launch T014: Open")
+        print("[12] Launch T015: Open")
+        print("[13] Launch T016: Open")
         print("\n[S] Stop Access Point")
         print("\n[0] Return to Main Menu")
 
@@ -406,40 +440,19 @@ def ap_profiles():
             break
 
         if choice in actions:
-            if choice in {"1", "2", "3", "4", "5", "6"}:
-                if os.path.exists("/tmp/wapt_ap_active"):
+            if choice == "S":
+                print()
+                actions[choice]()  # Stop AP
+            else:
+                # Preconfigured profiles (1–13)
+                if os.path.exists("/tmp/ap_active"):
                     print(colour("\n[!] An access point is already running.", "warning"))
                     input("\n[Press Enter to return to menu]")
-                    continue  # Return to submenu without prompting for NAT
+                    continue
 
-                # NAT prompt
-                nat_args = prompt_nat()
-
-                # BSSID prompt
-                use_bssid = input("[?] Use a custom (locally administered) BSSID? [y/N]: ").strip().lower()
-                if use_bssid == "y":
-                    profile_map = {
-                        "1": 1,
-                        "2": 2,
-                        "3": 3,
-                        "4": 4,
-                        "5": 5,
-                        "6": 6
-                    }
-                    profile_number = profile_map.get(choice, 0)
-                    generated_bssid = generate_bssid(profile_number)
-                    print(colour(f"[+] Custom BSSID selected: {generated_bssid}", "success"))
-                    print(colour("[*] You can verify BSSID assignment in the Service Status panel.", "info"))
-                    os.environ["BSSID"] = generated_bssid
-                else:
-                    os.environ.pop("BSSID", None)
-
+                os.environ.pop("BSSID", None)  # Ensure no leftover override
                 print()
-                actions[choice](nat_args)  # Call AP launcher with args
-
-            else:
-                print()
-                actions[choice]()  # Stop AP or other non-arg actions
+                actions[choice](None)
         else:
             ui_pause_on_invalid()
 

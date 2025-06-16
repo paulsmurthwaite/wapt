@@ -1,43 +1,36 @@
 #!/bin/bash
-# Usage:
-# ./start-ap.sh <profile> [nat]
-# Example:
-# ./start-ap.sh ap_wpa2            ← no internet for clients
-# ./start-ap.sh ap_open nat        ← clients get internet access
-
 set -e
 
 # ─── Paths ───
 BASH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG_DIR="$BASH_DIR/config"
 HELPERS_DIR="$BASH_DIR/helpers"
-UTILITIES_DIR="$BASH_DIR/utilities"
 SERVICES_DIR="$BASH_DIR/services"
+UTILITIES_DIR="$BASH_DIR/utilities"
+
+# ─── Profile ───
+PROFILE="$1"
+PROFILE_PATH="$CONFIG_DIR/${PROFILE}.cfg"
+
+# ─── Validate arguments ───
+if [[ -z "$PROFILE" || ! -f "$PROFILE_PATH" ]]; then
+    print_fail "Invalid profile. Usage: ./start-ap.sh <profile>"
+    exit 1
+fi
 
 # ─── Configs ───
 source "$CONFIG_DIR/global.conf"
+source "$PROFILE_PATH"
 
 # ─── Helpers ───
 source "$HELPERS_DIR/fn_print.sh"
 source "$HELPERS_DIR/fn_services.sh"
 
-# ─── Validate arguments ───
-PROFILE="$1"
-if [[ -z "$PROFILE" ]]; then
-    print_fail "No profile specified. Usage: ./start-ap.sh <profile> [nat]"
-    exit 1
-fi
-PROFILE_PATH="$CONFIG_DIR/${PROFILE}.cfg"
-if [[ ! -f "$PROFILE_PATH" ]]; then
-    print_fail "Profile config '$PROFILE_PATH' not found"
-    exit 1
-fi
-
-# ─── Load profile variables ───
-source "$PROFILE_PATH"
-
 # ─── Export for envsubst and BSSID support ───
-export INTERFACE SSID CHANNEL HIDDEN WPA_MODE PASSPHRASE WPA3 BSSID
+export INTERFACE SSID CHANNEL HIDDEN WPA_MODE PASSPHRASE BSSID
+
+# ─── Start AP ───
+print_info "Launching Access Point"
 
 # ─── Generate hostapd.conf ───
 if [[ -z "$WPA_MODE" ]]; then
@@ -53,69 +46,46 @@ else
     envsubst < "$CONFIG_DIR/hostapd.conf.template" > /tmp/hostapd.conf
 fi
 
-# ─── WPA3 enhancement (append SAE options if requested) ───
-if [[ "$WPA3" == "1" ]]; then
-    print_action "WPA3 - SAE enhancements enabled"
-    {
-        echo "ieee80211w=2"
-        echo "sae_require_mfp=1"
-        echo "wpa_key_mgmt=SAE WPA-PSK"
-    } >> /tmp/hostapd.conf
+# ─── Assign BSSID ───
+if [[ -z "$BSSID" ]]; then
+    BSSID=$(cat /sys/class/net/"$INTERFACE"/address)
 fi
 
-# ─── Apply custom BSSID if passed ───
-if [[ -n "$BSSID" ]]; then
-    print_action "Applying custom BSSID: $BSSID"
-    echo "bssid=$BSSID" >> /tmp/hostapd.conf
-fi
+export BSSID
 
-# ─── Stop NetworkManager ───
-print_action "Stopping NetworkManager"
+# ─── NetworkManager ───
 sudo systemctl stop NetworkManager
 
-# ─── Configure interface ───
-print_action "Configuring interface $INTERFACE"
-bash "$SERVICES_DIR/set-interface-down.sh"
+# ─── Interface ───
+print_waiting "Configuring interface $INTERFACE"
+
+bash "$SERVICES_DIR/set-interface-down.sh"  # IF Down
 sudo ip addr add "${GATEWAY}/24" dev "$INTERFACE"
-bash "$SERVICES_DIR/set-interface-up.sh"
+bash "$SERVICES_DIR/set-interface-up.sh"  # IF Up
+
+print_success "Interface $INTERFACE configured"
 
 # ─── IP forwarding ───
-print_action "Enabling IP forwarding"
 echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward > /dev/null
 
-# ─── Launch hostapd ───
-print_action "Starting hostapd"
+# ─── hostapd ───
 sudo hostapd /tmp/hostapd.conf -B
-
-# ─── NAT ───
-NAT_STATE="nonat"
-if [[ "$2" == "nat" ]]; then
-    NAT_STATE="nat"
+if ! pgrep hostapd > /dev/null; then
+    print_fail "hostapd failed to start"
+    exit 1
 fi
+
+# ─── AP status flag ───
+echo "$(date +%s)|$SSID|$BSSID|$CHANNEL" > /tmp/ap_active
+print_success "Access Point launch successful"
+
+# ─── Apply NAT rules ───
+print_action "Starting NAT: Client Internet access ENABLED"
+sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o "$FWD_INTERFACE" -j MASQUERADE
+sudo iptables -A FORWARD -i "$INTERFACE" -o "$FWD_INTERFACE" -j ACCEPT
+sudo iptables -A FORWARD -i "$FWD_INTERFACE" -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT
 
 # ─── Start Local Services ───
 start_dns_service
 start_ntp_service
 start_http_server
-
-# ─── Apply NAT rules ───
-if [[ "$NAT_STATE" == "nat" ]]; then
-    print_action "NAT enabled - client Internet access AVAILABLE"
-    sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o $FWD_INTERFACE -j MASQUERADE
-    sudo iptables -A FORWARD -i "$INTERFACE" -o $FWD_INTERFACE -j ACCEPT
-    sudo iptables -A FORWARD -i $FWD_INTERFACE -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT
-else
-    print_warn "NAT disabled - client Internet access BLOCKED"
-fi
-
-# ─── Retrieve BSSID from hostapd ───
-ACTUAL_BSSID=$(iw dev "$INTERFACE" info | awk '/addr/ {print toupper($2)}')
-
-# ─── Write AP status to file ───
-echo "$SSID|$(date +%s)|$NAT_STATE|$ACTUAL_BSSID" > /tmp/wapt_ap_active
-
-# ─── Display Status ───
-print_success "Access point '$SSID' is now running on $INTERFACE"
-if [[ -n "$BSSID" ]]; then
-    print_info "Custom BSSID applied - view details in the Service Status panel"
-fi
