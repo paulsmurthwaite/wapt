@@ -2,6 +2,31 @@
 
 All notable changes to the Wireless Access Point Toolkit (WAPT) will be documented in this file.
 
+## [v1.1.0] – 2025-06-14
+
+### Added
+- 13 fixed-parameter access point profiles aligned with WATT threat scenarios (T001–T016 subset)
+- New access point menu layout in `wapt.py`, removing custom profile support and mapping each scenario directly
+- Status tracking file (`/tmp/ap_active`) updated to log timestamp, SSID, BSSID, and channel
+- Launch parameters for each profile now include NAT by default; MAC address used as BSSID unless overridden
+
+### Changed
+- Removed legacy WPA3 and custom AP profile functionality from CLI and startup scripts
+- Refactored `start-ap.sh`:
+  - BSSID fallback to hardware MAC when custom BSSID is not set
+  - NAT rules always applied; conditional logic removed
+  - Configuration file loading reordered for correctness and reliability
+- Simplified launch logic by removing argument prompts for fixed profiles
+- Updated `print_service_status()` in `wapt.py` to show SSID, BSSID, channel, and start time
+
+### Fixed
+- Resolved issue with empty SSID substitutions by deferring variable export until after profile sourcing
+- Corrected behaviour when launching hidden SSID profiles, ensuring hostapd handles HIDDEN=1 consistently
+
+### Notes
+- WAPT is now feature-complete for Phase 3 scenario simulations
+- Remaining refinement tasks limited to cosmetic/UI polish or future WSTT integration triggers
+
 ## [v1.0.1] – 2025-05-20
 
 ### Changed
