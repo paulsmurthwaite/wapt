@@ -1,4 +1,4 @@
-/archive
+/archive/
 __pycache__
 *.pcap
 backup_wapt.sh
