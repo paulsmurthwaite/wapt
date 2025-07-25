@@ -79,13 +79,13 @@ fi
 echo "$(date +%s)|$SSID|$BSSID|$CHANNEL" > /tmp/ap_active
 print_success "Access Point launch successful"
 
-# ─── Apply NAT rules ───
+# ─── NAT ───
 print_action "Starting NAT: Client Internet access ENABLED"
 sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o "$FWD_INTERFACE" -j MASQUERADE
 sudo iptables -A FORWARD -i "$INTERFACE" -o "$FWD_INTERFACE" -j ACCEPT
 sudo iptables -A FORWARD -i "$FWD_INTERFACE" -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT
 
-# ─── Start Local Services ───
+# ─── Services ───
 start_dns_service
 start_ntp_service
 start_http_server
