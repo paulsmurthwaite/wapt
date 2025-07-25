@@ -1,72 +1,73 @@
 # Wireless Access Point Toolkit (WAPT)
 
-WAPT is a modular command-line toolkit for launching simulated wireless access points to support wireless threat simulations. It provides a set of predefined AP profiles corresponding to specific threat scenarios (T001–T016 subset) used in WATT (Wireless Attack Toolkit). The toolkit is optimised for reliability and consistency in controlled lab environments.
+A modular, accessible command-line toolkit for launching simulated wireless access points to support wireless threat simulations and cyber security research.
+
+## Table of Contents
+- [Features](#features)
+- [Accessibility & Inclusivity](#accessibility--inclusivity)
+- [Project Structure](#project-structure)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Access Point Profiles](#access-point-profiles)
+- [Session Logging](#session-logging)
+- [Developer Documentation](#developer-documentation)
+- [Contributing](#contributing)
+- [License](#license)
+- [Changelog](#changelog)
 
 ## Features
-
 - Scenario-aligned AP profiles for 13 WATT threats (e.g. Evil Twin, Open Rogue, Misconfigured)
-- Fixed parameters for each profile: SSID, BSSID, encryption, channel
-- NAT forwarding always enabled for client traffic routing
-- Custom BSSID generation for local admin testing (used in legacy versions only)
-- Service Status panel displays live SSID, BSSID, channel, and start time
-- Time-based status expiry and consistent cleanup via stop-ap.sh
 - Fully automated AP launch with no operator input required
-- Clean Bash/Python CLI integration with consistent symbol-based output
+- NAT forwarding and custom BSSID support
+- Live Service Status panel
+- Time-based status expiry and consistent cleanup
+- Modular Bash/Python CLI integration
+- Robust error handling and session logging
+- Accessibility: multiple colour themes, high-contrast and monochrome modes, keyboard navigation
 
-## Repository Structure
+## Accessibility & Inclusivity
+- Multiple colour themes: Dark, Light, High Contrast, Monochrome
+- High-contrast and monochrome modes for low vision and colourblind users
+- Fully keyboard-navigable menu system
+- Clear, consistent prompts and colour cues throughout the UI
+- Accessible to users with limited command-line experience
 
-The key files and directories are as follows:
-
+## Project Structure
 ```
 /src/
+├── python/
+│   ├── wapt.py
+│   └── logs/
+│       └── wapt_session.log
 ├── bash/
 │   ├── config/
-│   │   ├── config.sh
-│   │   ├── hostapd.conf.template
-│   │   ├── dnsmasq.conf
-│   │   ├── ap_t001.cfg
-│   │   ├── ap_t003_1.cfg
-│   │   ├── ap_t003_2.cfg
-│   │   ├── ap_t003_3.cfg
-│   │   ├── ap_t003_4.cfg
-│   │   ├── ap_t004.cfg
-│   │   ├── ap_t005.cfg
-│   │   ├── ap_t006.cfg
-│   │   ├── ap_t007.cfg
-│   │   ├── ap_t009.cfg
-│   │   ├── ap_t014.cfg
-│   │   ├── ap_t015.cfg
-│   │   └── ap_t016.cfg
 │   ├── helpers/
-│   │   ├── fn_print.sh
-│   │   ├── fn_services.sh
 │   ├── services/
-│   │   ├── set-interface-up.sh
-│   │   ├── set-interface-down.sh
-│   ├── utilities/
-│   │   ├── start-ap.sh
-│   │   ├── stop-ap.sh
-├── python/
-│   └── wapt.py
+│   └── utilities/
+├── docs/
+│   └── (Sphinx or other documentation)
 ```
 
+## Requirements
+- Linux host with support for hostapd, dnsmasq, iptables
+- Wireless interface supporting AP mode (e.g. Alfa AWUS036ACM)
+- Python 3.x
+
+## Installation
+1. Clone the repository
+2. Install Python dependencies (if any)
+3. Ensure required system packages are installed (hostapd, dnsmasq, iptables)
+
 ## Usage
-
-To launch WAPT:
-
 ```
 cd src/python
 python3 wapt.py
 ```
-
-From the menu:
-- Select a scenario-specific access point (T001–T016 subset)
-- AP is launched with fixed config (NAT and MAC defaults included)
-- Service Status reflects real-time AP state
-- Stop AP at any time from the menu
+- Use the menu to select and launch AP profiles, manage services, or change themes.
+- Session events are logged to `src/python/logs/wapt_session.log`.
 
 ## Access Point Profiles
-
 | Profile         | Description                                   | Security   |
 |-----------------|-----------------------------------------------|------------|
 | T001            | Open Access Point                             | None       |
@@ -79,14 +80,19 @@ From the menu:
 
 Each profile launches with L7 services (DNS, NTP, HTTP) and consistent interface configuration.
 
-## Requirements
+## Session Logging
+All user actions and errors are logged to `src/python/logs/wapt_session.log` with timestamps for audit and troubleshooting.
 
-- Linux host with support for hostapd, dnsmasq, iptables
-- Wireless interface supporting AP mode (e.g. Alfa AWUS036ACM)
-- Python 3.x for CLI interface
+## Developer Documentation
+- Code is fully documented with Google-style docstrings.
+- See the `docs/` directory for Sphinx-generated developer documentation (if present).
+- See CHANGELOG.md for release history.
 
-## Notes
+## Contributing
+Contributions are welcome! Please open an issue or pull request.
 
-- All APs use NAT routing by default via iptables
-- BSSID defaults to hardware MAC unless overridden (custom BSSID disabled by default)
-- Status is logged in /tmp/ap_active and auto-expires after 15 mins
+## License
+[MIT License](LICENSE)
+
+## Changelog
+See [CHANGELOG.md](CHANGELOG.md) for version history.

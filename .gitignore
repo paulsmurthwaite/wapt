@@ -3,3 +3,8 @@ __pycache__
 *.pcap
 backup_wapt.sh
 requirements.txt
+# Ignore all log files
+*.log
+
+# Ignore logs directory in Python source
+/src/python/logs/

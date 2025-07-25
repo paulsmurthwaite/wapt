@@ -18,6 +18,13 @@ import re
 import subprocess
 import sys
 import time
+import datetime
+
+LOG_FILE = "logs/wapt_session.log"
+
+# Define version and date at the top for easy update
+APP_VERSION = "v1.0"
+APP_DATE = "May 2025"
 
 # ─── UI Helpers ───
 # Theme Config
@@ -83,14 +90,21 @@ else:
 # UI Colour
 def colour(text, style):
     """
-    Apply ANSI colour styling to text based on theme.
+    Apply ANSI colour styling to text based on the current theme.
+
+    Args:
+        text (str): The text to style.
+        style (str): The style key (e.g., 'header', 'info', 'success').
+
+    Returns:
+        str: The styled text with ANSI codes.
     """
     return f"{COLOURS.get(style, '')}{text}{COLOURS['reset']}"
 
 # UI Banner
 def ui_banner():
     """
-    Display ASCII banner.
+    Display the ASCII art banner for the application using the current theme's header colour.
     """
     ascii_banner = pyfiglet.figlet_format("WAPT", font="ansi_shadow")
     print(colour(ascii_banner, "header"))
@@ -98,15 +112,21 @@ def ui_banner():
 # UI Header
 def ui_header(title="Wireless Access Point Toolkit"):
     """
-    Display section header.
+    Display a section header. If the main title, includes version and date.
+
+    Args:
+        title (str): The header text to display. Defaults to the main app title.
     """
-    styled = f"{COLOURS['bold']}{COLOURS['header']}[ {title} ]{COLOURS['reset']}"
+    if title == "Wireless Access Point Toolkit":
+        styled = f"{COLOURS['bold']}{COLOURS['header']}[ {title} {APP_VERSION} – {APP_DATE} ]{COLOURS['reset']}"
+    else:
+        styled = f"{COLOURS['bold']}{COLOURS['header']}[ {title} ]{COLOURS['reset']}"
     print(styled)
 
 # UI Divider
 def ui_divider():
     """
-    Display divider.
+    Print a horizontal divider line in the UI using the neutral colour.
     """
     print(colour("-----------------------------------", "neutral"))
     print()
@@ -114,7 +134,7 @@ def ui_divider():
 # UI Subtitle
 def ui_subtitle():
     """
-    Display combined subtitle.
+    Display a subtitle block: divider, interface status, service status, divider.
     """
     ui_divider()
     print_interface_status()
@@ -124,8 +144,10 @@ def ui_subtitle():
 # UI Standard Header
 def ui_standard_header(menu_title=None):
     """
-    Render standard UI header block: banner, main title, subtitle.
-    Optionally takes a menu title to display immediately after.
+    Render the standard UI header block: banner, main title, subtitle, and optional menu title.
+
+    Args:
+        menu_title (str, optional): If provided, displays this as a section header after the main title.
     """
     ui_banner()       # ASCII banner
     ui_header()       # Toolkit title
@@ -139,14 +161,14 @@ def ui_standard_header(menu_title=None):
 # UI Clear Screen
 def ui_clear_screen():
     """
-    Clear terminal screen.
+    Clear the terminal screen using the appropriate command for the OS.
     """
     os.system("cls" if os.name == "nt" else "clear")
 
 # UI Invalid Option
 def ui_pause_on_invalid():
     """
-    Display invalid input message and pause.
+    Display an invalid input warning and pause for user acknowledgment.
     """
     print(colour("\n[!] Invalid option. Please try again.", "warning"))
     input("[Press Enter to continue]")
@@ -155,7 +177,7 @@ def ui_pause_on_invalid():
 # 
 def print_interface_status():
     """
-    Print the current interface, state, and mode.
+    Print the current wireless interface, its state, and mode, with colour coding.
     """
     interface, state_raw, mode_raw = get_interface_details()
 
@@ -185,7 +207,8 @@ def print_interface_status():
 # 
 def print_service_status():
     """
-    Display Access Point status with time-based expiry, NAT state, and BSSID.
+    Display the current Access Point status, including expiry, NAT state, and BSSID.
+    Reads from /tmp/ap_active and shows 'Running' or 'Stopped' with details.
     """
     ap_file = "/tmp/ap_active"
     ap_raw = "Stopped"
@@ -221,7 +244,10 @@ def print_service_status():
 #
 def get_interface_details():
     """
-    Returns (interface, state, mode) from get-current-interface.sh.
+    Get the current wireless interface details by running a helper bash script.
+
+    Returns:
+        tuple: (interface, state, mode) as strings.
     """
     script_path = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "..", "bash", "services", "get-current-interface.sh")
@@ -242,27 +268,69 @@ def get_interface_details():
 
 def get_current_interface():
     """
-    Returns interface, state, mode.
+    Get the current wireless interface name.
+
+    Returns:
+        str: The interface name.
     """
     return get_interface_details()[0]
 
 def get_interface_state():
     """
-    Returns state from get_interface_details.
+    Get the current wireless interface state.
+
+    Returns:
+        str: The interface state.
     """
     return f"State:     {get_interface_details()[1]}"
 
 def get_interface_mode():
     """
-    Returns mode from get_interface_details.
+    Get the current wireless interface mode.
+
+    Returns:
+        str: The interface mode.
     """
     return f"Mode:      {get_interface_details()[2]}"
+
+# ─── Theme Management ───
+def set_theme(mode):
+    """
+    Set the global theme mode and update the COLOURS dictionary.
+
+    Args:
+        mode (str): The theme mode to set ('dark', 'light', 'high-contrast', 'monochrome').
+    """
+    global THEME_MODE, COLOURS
+    THEME_MODE = mode
+    if mode == "dark":
+        COLOURS = COLOURS_DARK
+    elif mode == "light":
+        COLOURS = COLOURS_LIGHT
+    elif mode == "high-contrast":
+        COLOURS = COLOURS_HIGH_CONTRAST
+    elif mode == "monochrome":
+        COLOURS = COLOURS_MONOCHROME
+    else:
+        COLOURS = COLOURS_DARK
+
+# Initialize theme from CLI args (moved from top-level)
+if __name__ == "__main__":
+    # Only parse CLI args on first run
+    if "--light" in sys.argv:
+        set_theme("light")
+    elif "--high-contrast" in sys.argv:
+        set_theme("high-contrast")
+    elif "--monochrome" in sys.argv:
+        set_theme("monochrome")
+    else:
+        set_theme("dark")
 
 # ─── Display Main Menu ───
 # 
 def show_menu():
     """
-    Display main menu.
+    Display the main menu, including current theme, and handle no user input.
     """
     ui_clear_screen()
     
@@ -276,7 +344,10 @@ def show_menu():
     ui_header("Services")
     print("[2] Service Control")
     print()
-    print("[3] Help | About")
+    # Show current theme in the menu
+    theme_label = THEME_MODE.replace("-", " ").title()
+    print(f"[3] Change Theme [{theme_label}]")
+    print("[4] Help | About")
 
     # Exit option
     print("\n[0] Exit")
@@ -285,12 +356,21 @@ def show_menu():
 #
 def run_bash_script(script_name, pause=True, capture=True, args=None, clear=True, title=None):
     """
-    Executes a Bash script located under /src/bash.
-    
+    Executes a Bash script located under /src/bash. Handles errors and logs events.
+
     Args:
-        script_name (str): Script name without extension (no .sh)
-        args (list): List of arguments to pass to the script
-        ...
+        script_name (str): Script name without extension (no .sh).
+        pause (bool): If True, pauses after execution.
+        capture (bool): If True, captures and prints script output.
+        args (list, optional): Arguments to pass to the script.
+        clear (bool): If True, clears the screen before running.
+        title (str, optional): Title to display before running.
+
+    Returns:
+        None
+
+    Side Effects:
+        Prints output to terminal. Logs errors to session log.
     """
     if clear:
         ui_clear_screen()
@@ -305,7 +385,9 @@ def run_bash_script(script_name, pause=True, capture=True, args=None, clear=True
     )
 
     if not os.path.exists(script_path):
-        print(f"[x] Script not found: {script_name}.sh")
+        error_msg = f"[x] Script not found: {script_name}.sh"
+        print(error_msg)
+        log_event(f"ERROR: {error_msg}")
         return
 
     cmd = ["bash", script_path]
@@ -325,39 +407,79 @@ def run_bash_script(script_name, pause=True, capture=True, args=None, clear=True
             subprocess.run(cmd, check=True)
 
     except subprocess.CalledProcessError as e:
-        print(colour(f"[x] Script failed: {script_name}.sh", "warning"))
+        error_msg = f"[x] Script failed: {script_name}.sh"
+        print(colour(error_msg, "warning"))
         if e.stderr:
             print(e.stderr.strip())
+        log_event(f"ERROR: {error_msg} | {e.stderr.strip() if e.stderr else ''}")
+    except Exception as e:
+        error_msg = f"[x] Unexpected error running script: {script_name}.sh"
+        print(colour(error_msg, "warning"))
+        print(e)
+        log_event(f"UNEXPECTED ERROR: {error_msg} | {str(e)}")
 
     if pause:
         input("\n[Press Enter to return to menu]")
 
 def prompt_nat():
     """
-    Prompt user to enable NAT.
+    Prompt the user to enable NAT forwarding for the selected AP profile.
+
+    Returns:
+        list: ["nat"] if enabled, otherwise an empty list.
     """
-    response = input("\n[?] Enable NAT forwarding for this profile? [y/N]: ").strip().lower()
+    response = input(f"\n[{colour('?', 'header')}] Enable NAT forwarding for this profile? [y/N]: ").strip().lower()
     return ["nat"] if response == "y" else []
 
 def generate_bssid(profile_number: int) -> str:
     """
-    Generate a locally administered MAC address with profile-specific last octet.
+    Generate a locally administered MAC address with a profile-specific last octet.
+
+    Args:
+        profile_number (int): The AP profile number to encode in the MAC address.
+
+    Returns:
+        str: The generated MAC address as a string.
     """
     # First byte 0x02 = locally administered
     base = [0x02, 0x00, 0x00, 0x00, 0x00, profile_number]
     return ":".join(f"{octet:02X}" for octet in base)
 
+def log_event(message):
+    """
+    Append a timestamped event to the session log file. Ensures the logs directory exists.
+    Logs file write errors to stderr.
+
+    Args:
+        message (str): The event message to log.
+    """
+    # Ensure logs directory exists
+    log_dir = os.path.dirname(LOG_FILE)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with open(LOG_FILE, "a") as f:
+            f.write(f"{timestamp} | {message}\n")
+    except Exception as e:
+        print(colour("[x] Failed to write to log file.", "warning"))
+        print(e)
+
 def ap_profiles():
     """
-    Access Points submenu.
+    Display the Access Points submenu, allowing the user to launch or stop AP profiles.
+    Handles user input and logs AP launches.
     """
     def ap_t001(_):
+        log_event("Launched AP profile: T001")
         run_bash_script("utilities/start-ap", args=["ap_t001", "nat"], capture=False, pause=False, clear=False, title="T001: Open")
 
     def ap_t003_1(_):
+        log_event("Launched AP profile: T003_1")
         run_bash_script("utilities/start-ap", args=["ap_t003_1", "nat"], capture=False, pause=True, clear=False, title="T003: Open")
 
     def ap_t003_2(_):
+        log_event("Launched AP profile: T003_2")
         run_bash_script("utilities/start-ap", args=["ap_t003_2", "nat"], capture=False, pause=True, clear=False, title="T003: WPA2")
 
     def ap_t003_3(_):
@@ -434,7 +556,7 @@ def ap_profiles():
         print("\n[0] Return to Main Menu")
 
         # Input
-        choice = input("\n[?] Select an option: ").strip().upper()
+        choice = input(f"\n[{colour('?', 'header')}] Select an option: ").strip().upper()
 
         if choice == "0":
             break
@@ -458,7 +580,8 @@ def ap_profiles():
 
 def service_control():
     """
-    Service Control menu.
+    Display the Service Control menu, providing access to interface and service management.
+    Handles user input and calls relevant submenus.
     """
 
     def show_dhcp_leases():
@@ -495,7 +618,7 @@ def service_control():
             print("\n[0] Return to Service Control Menu")
 
             # Input
-            choice = input("\n[?] Select an option: ")
+            choice = input(f"\n[{colour('?', 'header')}] Select an option: ")
 
             if choice == "0":
                 break
@@ -535,7 +658,7 @@ def service_control():
             print("\n[0] Return to Service Control Menu")
 
             # Input
-            choice = input("\n[?] Select an option: ")
+            choice = input(f"\n[{colour('?', 'header')}] Select an option: ")
 
             if choice == "0":
                 break
@@ -575,7 +698,7 @@ def service_control():
             print("\n[0] Return to Service Control Menu")
 
             # Input
-            choice = input("\n[?] Select an option: ")
+            choice = input(f"\n[{colour('?', 'header')}] Select an option: ")
 
             if choice == "0":
                 break
@@ -610,7 +733,7 @@ def service_control():
         print("\n[0] Return to Main Menu")
 
         # Input
-        choice = input("\n[?] Select an option: ")
+        choice = input(f"\n[{colour('?', 'header')}] Select an option: ")
 
         if choice == "0":
             break
@@ -624,13 +747,18 @@ def service_control():
 
 def help_about():
     """
-    Help | About submenu.
+    Display the Help | About submenu, including inclusivity features and project info.
     """
     ui_clear_screen()
-
     # Header block
     ui_standard_header("Help | About")
-
+    print(colour("Inclusivity & Accessibility Features:", "header"))
+    print("  • Multiple colour themes: Dark, Light, High Contrast, Monochrome")
+    print("  • High-contrast and monochrome modes for low vision and colourblind users")
+    print("  • Fully keyboard-navigable menu system")
+    print("  • Clear, consistent prompts and colour cues throughout the UI")
+    print("  • Accessible to users with limited command-line experience")
+    print()
     print("This tool provides a command-line interface for managing")
     print("wireless access point profiles in a structured testbed environment.")
     print()
@@ -643,37 +771,95 @@ def help_about():
     print("All operations are driven by modular Bash scripts, coordinated")
     print("through a unified Python menu for SME-friendly field usage.")
     print()
-    print("Author : Paul Smurthwaite")
-    print("Module : TM470-25B")
-    print("Date   : May 2025")
-
+    print(f"Author : Paul Smurthwaite")
+    print(f"Module : TM470-25B")
+    print(f"Version: {APP_VERSION}")
+    print(f"Date   : {APP_DATE}")
     # Input
     input("\n[Press Enter to return to menu]")
 
-def main():
+def theme_menu():
     """
-    User input handler.
+    Display the theme selection submenu, allowing the user to change the colour theme.
+    Handles user input and logs theme changes.
     """
     while True:
-        show_menu()
-        choice = input("\n[?] Select an option: ")
-        
-        if choice == "1":
-            ap_profiles()
-        elif choice == "2":
-            service_control()
-        elif choice == "3":
-            help_about()
-        elif choice == "0":
-            if os.path.exists("/tmp/wapt_ap_active"):
-                print(colour("\n[!] Stopping running access point", "warning"))
-                run_bash_script("stop-ap", pause=False, capture=False, clear=False)
-
-            print(colour("\n[+] Exiting to shell.", "success"))
+        ui_clear_screen()
+        ui_standard_header("Change Theme")
+        print("Select a theme:\n")
+        print("[1] Dark (default)")
+        print("[2] Light")
+        print("[3] High Contrast")
+        print("[4] Monochrome")
+        print("\n[0] Return to Main Menu")
+        choice = input(f"\n[{colour('?', 'header')}] Select a theme: ").strip()
+        if choice == "0":
             break
-
+        elif choice == "1":
+            set_theme("dark")
+            log_event("Theme changed to 'Dark'")
+            print(colour("\n[+] Theme changed to Dark.", "success"))
+            input("[Press Enter to continue]")
+            break
+        elif choice == "2":
+            set_theme("light")
+            log_event("Theme changed to 'Light'")
+            print(colour("\n[+] Theme changed to Light.", "success"))
+            input("[Press Enter to continue]")
+            break
+        elif choice == "3":
+            set_theme("high-contrast")
+            log_event("Theme changed to 'High Contrast'")
+            print(colour("\n[+] Theme changed to High Contrast.", "success"))
+            input("[Press Enter to continue]")
+            break
+        elif choice == "4":
+            set_theme("monochrome")
+            log_event("Theme changed to 'Monochrome'")
+            print(colour("\n[+] Theme changed to Monochrome.", "success"))
+            input("[Press Enter to continue]")
+            break
         else:
+            log_event(f"Theme menu: Invalid option '{choice}'")
             ui_pause_on_invalid()
+
+def main():
+    """
+    Main user input handler and application loop. Handles menu navigation, logging, and error handling.
+    """
+    log_event("Session started")
+    try:
+        while True:
+            show_menu()
+            choice = input(f"\n[{colour('?', 'header')}] Select an option: ").strip()
+            if choice == "1":
+                log_event("Main menu: Selected 'Access Points'")
+                ap_profiles()
+            elif choice == "2":
+                log_event("Main menu: Selected 'Service Control'")
+                service_control()
+            elif choice == "3":
+                log_event(f"Main menu: Selected 'Change Theme' (current: {THEME_MODE})")
+                theme_menu()
+            elif choice == "4":
+                log_event("Main menu: Selected 'Help | About'")
+                help_about()
+            elif choice == "0":
+                if os.path.exists("/tmp/wapt_ap_active"):
+                    print(colour("\n[!] Stopping running access point", "warning"))
+                    run_bash_script("stop-ap", pause=False, capture=False, clear=False)
+                print(colour("\n[+] Exiting to shell.", "warning"))
+                log_event("Session ended")
+                break
+            else:
+                log_event(f"Main menu: Invalid option '{choice}'")
+                ui_pause_on_invalid()
+    except KeyboardInterrupt:
+        print(colour("\n[!] Session interrupted by user.", "warning"))
+        log_event("Session interrupted by user (KeyboardInterrupt)")
+    except Exception as e:
+        print(colour("[x] An unexpected error occurred. See log for details.", "warning"))
+        log_event(f"UNEXPECTED ERROR: {str(e)}")
 
 if __name__ == "__main__":
     main()
