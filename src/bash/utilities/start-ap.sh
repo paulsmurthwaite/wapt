@@ -45,6 +45,7 @@ print_info "Launching Access Point"
 # ─── Generate hostapd.conf ───
 if [[ -z "$WPA_MODE" ]]; then
     print_action "Launching unencrypted AP - skipping WPA config"
+    # Strip all WPA-related directives from the template for an open AP
     grep -v '^wpa=' "$CONFIG_DIR/hostapd.conf.template" \
     | grep -v '^wpa_passphrase=' \
     | grep -v '^wpa_key_mgmt=' \

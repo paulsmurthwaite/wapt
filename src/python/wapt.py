@@ -326,7 +326,7 @@ def set_theme(mode):
 
 # Initialize theme from CLI args (moved from top-level)
 if __name__ == "__main__":
-    # Only parse CLI args on first run
+    # Initialize theme based on command-line arguments
     if "--light" in sys.argv:
         set_theme("light")
     elif "--high-contrast" in sys.argv:
@@ -609,13 +609,13 @@ def service_control():
         else:
             try:
                 # Construct the new filename
-                log_dir = os.path.dirname(LOG_FILE)
+                log_path = Path(LOG_FILE)
                 timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 archive_filename = f"wapt_session_{timestamp}.log"
-                archive_path = os.path.join(log_dir, archive_filename)
+                archive_path = log_path.with_name(archive_filename)
 
                 # Rename the file
-                os.rename(LOG_FILE, archive_path)
+                log_path.rename(archive_path)
 
                 # Log the event to the *new* log file that will be created
                 log_event(f"Previous log archived to {archive_filename}")
