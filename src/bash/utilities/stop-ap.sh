@@ -38,12 +38,8 @@ else
     print_warn "hostapd not running"
 fi
 
-# ─── Interface ───
-print_action "Resetting interface $INTERFACE"
-bash "$SERVICES_DIR/reset-interface-soft.sh"
-print_success "Interface $INTERFACE reset"
-
-# ─── NetworkManager ───
-sudo systemctl start NetworkManager
+# ─── Interface & NetworkManager ───
+print_action "Resetting interface $INTERFACE and restoring NetworkManager"
+bash "$SERVICES_DIR/interface-ctl.sh" reset soft
 
 print_success "Access Point shutdown successful"

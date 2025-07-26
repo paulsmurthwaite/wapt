@@ -6,7 +6,7 @@
 # ─── HTTP Server ───
 start_http_server() {
     print_action "Starting HTTP server on port 80"
-    
+
     local WEB_ROOT="/srv/wapt/www"
 
     # Create target web root
@@ -42,6 +42,8 @@ start_http_server() {
 stop_http_server() {
     print_action "Stopping HTTP server"
 
+    local WEB_ROOT="/srv/wapt/www"
+
     if [[ -f /tmp/wapt_http_server.pid ]]; then
         HTTP_PID=$(cat /tmp/wapt_http_server.pid)
         sudo kill "$HTTP_PID" > /dev/null 2>&1
@@ -52,25 +54,31 @@ stop_http_server() {
     fi
 
     # Clean up captive portal files
-    local WEB_ROOT="/srv/watt/www"
-    sudo rm -f "$WEB_ROOT/index.html" "$WEB_ROOT/submit"
-    print_success "Captive portal files removed"
+    if [ -d "$WEB_ROOT" ]; then
+        sudo rm -f "$WEB_ROOT/index.html" "$WEB_ROOT/submit"
+        print_success "Captive portal files removed"
+    fi
 }
 
 # ─── DNS Server Wrapper ───
 start_dns_service() {
+    # systemd-resolved must be stopped to allow dnsmasq to bind to port 53.
     print_action "Disabling systemd-resolved"
     sudo systemctl stop systemd-resolved
 
+    # The host itself needs a resolver. We point it to a public DNS server.
+    # This does not affect the clients, who will use dnsmasq on the AP.
     print_action "Overriding resolv.conf with 9.9.9.9"
     sudo rm -f /etc/resolv.conf
     echo "nameserver 9.9.9.9" | sudo tee /etc/resolv.conf > /dev/null
 
     print_action "Starting dnsmasq (DHCP + DNS)"
+    # Using -C ensures dnsmasq uses our specific config file.
     sudo dnsmasq -C "$CONFIG_DIR/dnsmasq.conf"
 }
 
 stop_dns_service() {
+    # Using pkill is broad, but effective for stopping all dnsmasq instances.
     print_action "Stopping dnsmasq"
     if pgrep dnsmasq > /dev/null; then
         sudo pkill dnsmasq
@@ -78,9 +86,11 @@ stop_dns_service() {
         print_warn "dnsmasq not running"
     fi
 
+    # Re-enable the system's default DNS resolver.
     print_action "Restoring systemd-resolved"
     sudo systemctl start systemd-resolved
 
+    # Restore the original symlink for /etc/resolv.conf.
     print_action "Relinking /etc/resolv.conf"
     sudo rm -f /etc/resolv.conf
     sudo ln -s /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf

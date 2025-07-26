@@ -1,43 +1,45 @@
 #!/bin/bash
 
 # ─── Standardise Output Formatting ───
+# These functions provide consistent, prefixed status messages.
+# They use printf for better portability and safe handling of arguments.
 
 print_section() {
-    echo -e "\033[1m[ $1 ]\033[0m"
+    printf "\033[1m[ %s ]\033[0m\n" "$1"
 }
 
 print_info() {
-    echo "[*] $1"
+    printf "[*] %s\n" "$1"
 }
 
 print_success() {
-    echo "[+] $1"
+    printf "[+] %s\n" "$1"
 }
 
 print_fail() {
-    echo "[x] $1"
+    printf "[x] %s\n" "$1"
 }
 
 print_warn() {
-    echo "[!] $1"
+    printf "[!] %s\n" "$1"
 }
 
 print_action() {
-    echo "[>] $1"
+    printf "[>] %s\n" "$1"
 }
 
 print_waiting() {
-    echo "[~] $1"
+    printf "[~] %s\n" "$1"
 }
 
 print_prompt() {
-    echo -n "[?] $1"
+    printf "[?] %s" "$1"
 }
 
 print_none() {
-    echo "$1"
+    printf "%s\n" "$1"
 }
 
 print_blank() {
-    echo ""
+    printf "\n"
 }

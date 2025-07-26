@@ -8,23 +8,33 @@ HELPERS_DIR="$BASH_DIR/helpers"
 SERVICES_DIR="$BASH_DIR/services"
 UTILITIES_DIR="$BASH_DIR/utilities"
 
+# ─── Helpers ───
+# Source helpers early for logging and utility functions.
+source "$HELPERS_DIR/fn_print.sh"
+
 # ─── Profile ───
 PROFILE="$1"
 PROFILE_PATH="$CONFIG_DIR/${PROFILE}.cfg"
 
 # ─── Validate arguments ───
 if [[ -z "$PROFILE" || ! -f "$PROFILE_PATH" ]]; then
-    print_fail "Invalid profile. Usage: ./start-ap.sh <profile>"
+    print_fail "Invalid profile specified or file not found: $PROFILE_PATH"
     exit 1
 fi
 
 # ─── Configs ───
 source "$CONFIG_DIR/global.conf"
 source "$PROFILE_PATH"
-
-# ─── Helpers ───
-source "$HELPERS_DIR/fn_print.sh"
 source "$HELPERS_DIR/fn_services.sh"
+
+# Determine NAT status from script arguments
+if [[ " $@ " =~ " nat " ]]; then
+  NAT_ENABLED=true
+  NAT_STATUS="NAT"
+else
+  NAT_ENABLED=false
+  NAT_STATUS="No NAT"
+fi
 
 # ─── Export for envsubst and BSSID support ───
 export INTERFACE SSID CHANNEL HIDDEN WPA_MODE PASSPHRASE BSSID
@@ -53,17 +63,8 @@ fi
 
 export BSSID
 
-# ─── NetworkManager ───
-sudo systemctl stop NetworkManager
-
 # ─── Interface ───
-print_waiting "Configuring interface $INTERFACE"
-
-bash "$SERVICES_DIR/set-interface-down.sh"  # IF Down
-sudo ip addr add "${GATEWAY}/24" dev "$INTERFACE"
-bash "$SERVICES_DIR/set-interface-up.sh"  # IF Up
-
-print_success "Interface $INTERFACE configured"
+bash "$SERVICES_DIR/interface-ctl.sh" setup-ap
 
 # ─── IP forwarding ───
 echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward > /dev/null
@@ -76,14 +77,18 @@ if ! pgrep hostapd > /dev/null; then
 fi
 
 # ─── AP status flag ───
-echo "$(date +%s)|$SSID|$BSSID|$CHANNEL" > /tmp/ap_active
+echo "$(date +%s)|$SSID|$BSSID|$CHANNEL|$NAT_STATUS" > /tmp/ap_active
 print_success "Access Point launch successful"
 
 # ─── NAT ───
-print_action "Starting NAT: Client Internet access ENABLED"
-sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o "$FWD_INTERFACE" -j MASQUERADE
-sudo iptables -A FORWARD -i "$INTERFACE" -o "$FWD_INTERFACE" -j ACCEPT
-sudo iptables -A FORWARD -i "$FWD_INTERFACE" -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT
+if [ "$NAT_ENABLED" = true ]; then
+    print_action "Starting NAT: Client Internet access ENABLED"
+    sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o "$FWD_INTERFACE" -j MASQUERADE
+    sudo iptables -A FORWARD -i "$INTERFACE" -o "$FWD_INTERFACE" -j ACCEPT
+    sudo iptables -A FORWARD -i "$FWD_INTERFACE" -o "$INTERFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT
+else
+    print_action "Skipping NAT: Client Internet access DISABLED"
+fi
 
 # ─── Services ───
 start_dns_service

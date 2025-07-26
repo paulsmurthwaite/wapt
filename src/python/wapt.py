@@ -19,12 +19,14 @@ import subprocess
 import sys
 import time
 import datetime
+from pathlib import Path
 
 LOG_FILE = "logs/wapt_session.log"
+AP_ACTIVE_FILE = "/tmp/ap_active"
 
 # Define version and date at the top for easy update
-APP_VERSION = "v1.0"
-APP_DATE = "May 2025"
+APP_VERSION = "v1.2"
+APP_DATE = "2025-05-17"
 
 # ─── UI Helpers ───
 # Theme Config
@@ -106,6 +108,7 @@ def ui_banner():
     """
     Display the ASCII art banner for the application using the current theme's header colour.
     """
+    # Use pyfiglet to generate the banner dynamically
     ascii_banner = pyfiglet.figlet_format("WAPT", font="ansi_shadow")
     print(colour(ascii_banner, "header"))
 
@@ -210,31 +213,36 @@ def print_service_status():
     Display the current Access Point status, including expiry, NAT state, and BSSID.
     Reads from /tmp/ap_active and shows 'Running' or 'Stopped' with details.
     """
-    ap_file = "/tmp/ap_active"
     ap_raw = "Stopped"
 
     # Expiry threshold
     expiry_seconds = 900
 
-    if os.path.exists(ap_file):
+    if os.path.exists(AP_ACTIVE_FILE):
         try:
-            with open(ap_file, "r") as f:
+            with open(AP_ACTIVE_FILE, "r") as f:
                 content = f.read().strip()
                 parts = content.split("|")
 
+                # Expecting at least 4 parts: timestamp|ssid|bssid|channel
+                # A 5th part for NAT status is optional for backward compatibility.
                 if len(parts) >= 4:
                     timestamp = int(parts[0])
-                    ssid = parts[1]
-                    bssid = parts[2]
-                    channel = parts[3]
+                    ssid = parts[1] or "N/A"
+                    bssid = parts[2] or "N/A"
+                    channel = parts[3] or "N/A"
+                    nat_status = parts[4] if len(parts) >= 5 else None
 
                     age = time.time() - timestamp
 
                     if age <= expiry_seconds:
                         start_time = time.strftime("%H:%M:%S", time.localtime(timestamp))
-                        ap_raw = f"Running ({start_time}, {ssid}, CH {channel}, BSSID {bssid})"
-        except Exception:
-            pass  # Keep ap_raw as "Stopped"
+                        if nat_status:
+                            ap_raw = f"Running ({start_time}, {ssid}, CH {channel}, {nat_status}, BSSID {bssid})"
+                        else:
+                            ap_raw = f"Running ({start_time}, {ssid}, CH {channel}, BSSID {bssid})"
+        except Exception as e:
+            log_event(f"ERROR: Could not read AP status file {AP_ACTIVE_FILE}: {e}")
 
     style = "success" if ap_raw == "Stopped" else "warning"
     print(f"[ Access Point ] {colour(ap_raw, style)}")
@@ -249,15 +257,17 @@ def get_interface_details():
     Returns:
         tuple: (interface, state, mode) as strings.
     """
-    script_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "bash", "services", "get-current-interface.sh")
-    )
+    # Base directory for bash scripts
+    base_path = Path(__file__).parent.parent / "bash"
+    script_path = (base_path / "services" / "interface-ctl.sh").resolve()
 
-    if not os.path.exists(script_path):
+    # Security check: ensure the script is within the bash directory and exists
+    if not script_path.is_file() or base_path not in script_path.parents:
         return ("[!] Not found", "[!] Not found", "[!] Not found")
 
     try:
-        result = subprocess.run(["bash", script_path], capture_output=True, text=True, check=True)
+        # Use string representation of the Path object for the command
+        result = subprocess.run(["bash", str(script_path), "status"], capture_output=True, text=True, check=True)
         lines = result.stdout.strip().splitlines()
         interface = lines[0].split(":")[1].strip().upper() if len(lines) > 0 else "?"
         state     = lines[1].split(":")[1].strip().upper() if len(lines) > 1 else "?"
@@ -379,18 +389,21 @@ def run_bash_script(script_name, pause=True, capture=True, args=None, clear=True
         ui_header(title)
         print()
 
-    # Script full path
-    script_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "bash", f"{script_name}.sh")
-    )
+    # Base directory for bash scripts
+    base_path = Path(__file__).parent.parent / "bash"
 
-    if not os.path.exists(script_path):
-        error_msg = f"[x] Script not found: {script_name}.sh"
-        print(error_msg)
+    # Resolve the script path safely
+    script_path = (base_path / f"{script_name}.sh").resolve()
+
+    # Security check: ensure the script is within the bash directory and exists
+    if not script_path.is_file() or base_path not in script_path.parents:
+        error_msg = f"Script not found or invalid path: {script_name}.sh"
+        print(colour(f"[x] {error_msg}", "warning"))
         log_event(f"ERROR: {error_msg}")
         return
 
-    cmd = ["bash", script_path]
+    # Use string representation of the Path object for the command
+    cmd = ["bash", str(script_path)]
     if args:
         cmd.extend(args)
 
@@ -407,11 +420,13 @@ def run_bash_script(script_name, pause=True, capture=True, args=None, clear=True
             subprocess.run(cmd, check=True)
 
     except subprocess.CalledProcessError as e:
-        error_msg = f"[x] Script failed: {script_name}.sh"
-        print(colour(error_msg, "warning"))
+        failed_command = " ".join(e.cmd)
+        error_msg = f"Script failed: {script_name}.sh"
+        log_msg = f"ERROR: {error_msg} | Command: '{failed_command}' | Stderr: {e.stderr.strip() if e.stderr else 'N/A'}"
+        print(colour(f"[x] {error_msg}", "warning"))
         if e.stderr:
             print(e.stderr.strip())
-        log_event(f"ERROR: {error_msg} | {e.stderr.strip() if e.stderr else ''}")
+        log_event(log_msg)
     except Exception as e:
         error_msg = f"[x] Unexpected error running script: {script_name}.sh"
         print(colour(error_msg, "warning"))
@@ -428,8 +443,8 @@ def prompt_nat():
     Returns:
         list: ["nat"] if enabled, otherwise an empty list.
     """
-    response = input(f"\n[{colour('?', 'header')}] Enable NAT forwarding for this profile? [y/N]: ").strip().lower()
-    return ["nat"] if response == "y" else []
+    response = input(f"[{colour('?', 'header')}] Enable NAT forwarding for this profile? [Y/n]: ").strip().lower()
+    return ["nat"] if response != "n" else []
 
 def generate_bssid(profile_number: int) -> str:
     """
@@ -465,72 +480,30 @@ def log_event(message):
         print(colour("[x] Failed to write to log file.", "warning"))
         print(e)
 
+AP_PROFILES = [
+    {"id": "T001", "desc": "Open", "config": "ap_t001", "pause": True},
+    {"id": "T003", "desc": "Open", "config": "ap_t003_1", "pause": True},
+    {"id": "T003", "desc": "WPA2", "config": "ap_t003_2", "pause": True},
+    {"id": "T003", "desc": "WPA2 Hidden SSID", "config": "ap_t003_3", "pause": True},
+    {"id": "T003", "desc": "Misconfigured", "config": "ap_t003_4", "pause": True},
+    {"id": "T004", "desc": "WPA2", "config": "ap_t004", "pause": True},
+    {"id": "T005", "desc": "WPA2", "config": "ap_t005", "pause": True},
+    {"id": "T006", "desc": "Misconfigured", "config": "ap_t006", "pause": True},
+    {"id": "T007", "desc": "WPA2", "config": "ap_t007", "pause": True},
+    {"id": "T009", "desc": "WPA2", "config": "ap_t009", "pause": True},
+    {"id": "T014", "desc": "Open", "config": "ap_t014", "pause": True},
+    {"id": "T015", "desc": "Open", "config": "ap_t015", "pause": True},
+    {"id": "T016", "desc": "Open", "config": "ap_t016", "pause": True},
+]
+
 def ap_profiles():
     """
     Display the Access Points submenu, allowing the user to launch or stop AP profiles.
     Handles user input and logs AP launches.
     """
-    def ap_t001(_):
-        log_event("Launched AP profile: T001")
-        run_bash_script("utilities/start-ap", args=["ap_t001", "nat"], capture=False, pause=False, clear=False, title="T001: Open")
-
-    def ap_t003_1(_):
-        log_event("Launched AP profile: T003_1")
-        run_bash_script("utilities/start-ap", args=["ap_t003_1", "nat"], capture=False, pause=True, clear=False, title="T003: Open")
-
-    def ap_t003_2(_):
-        log_event("Launched AP profile: T003_2")
-        run_bash_script("utilities/start-ap", args=["ap_t003_2", "nat"], capture=False, pause=True, clear=False, title="T003: WPA2")
-
-    def ap_t003_3(_):
-        run_bash_script("utilities/start-ap", args=["ap_t003_3", "nat"], capture=False, pause=True, clear=False, title="T003: WPA2 Hidden SSID")
-
-    def ap_t003_4(_):
-        run_bash_script("utilities/start-ap", args=["ap_t003_4", "nat"], capture=False, pause=True, clear=False, title="T003: Misconfigured")
-
-    def ap_t004(_):
-        run_bash_script("utilities/start-ap", args=["ap_t004", "nat"], capture=False, pause=False, clear=False, title="T004: WPA2")
-
-    def ap_t005(_):
-        run_bash_script("utilities/start-ap", args=["ap_t005", "nat"], capture=False, pause=False, clear=False, title="T005: WPA2")
-
-    def ap_t006(_):
-        run_bash_script("utilities/start-ap", args=["ap_t006", "nat"], capture=False, pause=False, clear=False, title="T006: Misconfigured")
-
-    def ap_t007(_):
-        run_bash_script("utilities/start-ap", args=["ap_t007", "nat"], capture=False, pause=False, clear=False, title="T007: WPA2")
-
-    def ap_t009(_):
-        run_bash_script("utilities/start-ap", args=["ap_t009", "nat"], capture=False, pause=False, clear=False, title="T009: WPA2")
-
-    def ap_t014(_):
-        run_bash_script("utilities/start-ap", args=["ap_t014", "nat"], capture=False, pause=False, clear=False, title="T014: Open")
-
-    def ap_t015(_):
-        run_bash_script("utilities/start-ap", args=["ap_t015", "nat"], capture=False, pause=False, clear=False, title="T015: Open")
-
-    def ap_t016(_):
-        run_bash_script("utilities/start-ap", args=["ap_t016", "nat"], capture=False, pause=False, clear=False, title="T016: Open")
-
     def stop_ap():
-        run_bash_script("utilities/stop-ap", pause=True, capture=False, clear=False, title="Stop Access Point")
-
-    actions = {
-        "1": ap_t001,
-        "2": ap_t003_1,
-        "3": ap_t003_2,
-        "4": ap_t003_3,
-        "5": ap_t003_4,
-        "6": ap_t004,
-        "7": ap_t005,
-        "8": ap_t006,
-        "9": ap_t007,
-        "10": ap_t009,
-        "11": ap_t014,
-        "12": ap_t015,
-        "13": ap_t016,
-        "S": stop_ap
-    }
+        log_event("Action: Stop Access Point")
+        run_bash_script("utilities/stop-ap", pause=True, capture=False, clear=True, title="Stop Access Point")
 
     while True:
         ui_clear_screen()
@@ -538,45 +511,62 @@ def ap_profiles():
         # Header block
         ui_standard_header("Standalone Access Point Profiles")
 
-        # Menu block
-        print("[1] Launch T001: Open")
-        print("[2] Launch T003: Open")
-        print("[3] Launch T003: WPA2")
-        print("[4] Launch T003: WPA2 Hidden SSID")
-        print("[5] Launch T003: Misconfigured")
-        print("[6] Launch T004: WPA2")
-        print("[7] Launch T005: WPA2")
-        print("[8] Launch T006: Misconfigured")
-        print("[9] Launch T007: WPA2")
-        print("[10] Launch T009: WPA2")
-        print("[11] Launch T014: Open")
-        print("[12] Launch T015: Open")
-        print("[13] Launch T016: Open")
+        # Menu block - generated from AP_PROFILES
+        for i, profile in enumerate(AP_PROFILES, 1):
+            print(f"[{i}] Launch {profile['id']}: {profile['desc']}")
+
         print("\n[S] Stop Access Point")
         print("\n[0] Return to Main Menu")
 
         # Input
         choice = input(f"\n[{colour('?', 'header')}] Select an option: ").strip().upper()
 
-        if choice == "0":
-            break
+        if choice == "0": break
+        if choice == "S":
+            stop_ap()
+            continue
 
-        if choice in actions:
-            if choice == "S":
-                print()
-                actions[choice]()  # Stop AP
-            else:
-                # Preconfigured profiles (1–13)
-                if os.path.exists("/tmp/ap_active"):
-                    print(colour("\n[!] An access point is already running.", "warning"))
-                    input("\n[Press Enter to return to menu]")
-                    continue
-
-                os.environ.pop("BSSID", None)  # Ensure no leftover override
-                print()
-                actions[choice](None)
-        else:
+        try:
+            profile_index = int(choice) - 1
+            if not 0 <= profile_index < len(AP_PROFILES):
+                raise ValueError
+        except ValueError:
             ui_pause_on_invalid()
+            continue
+
+        if os.path.exists(AP_ACTIVE_FILE):
+            print(colour("\n[!] An access point is already running.", "warning"))
+            input("\n[Press Enter to return to menu]")
+            continue
+
+        # Get selected profile
+        profile = AP_PROFILES[profile_index]
+        title = f"{profile['id']}: {profile['desc']}"
+
+        # Get launch arguments, starting with the profile config name
+        args = [profile["config"]]
+        # Prompt for NAT and add 'nat' to args if user agrees
+        args.extend(prompt_nat())
+
+        # Prompt for custom BSSID
+        os.environ.pop("BSSID", None)
+        bssid_choice = input(f"[{colour('?', 'header')}] Use a custom BSSID for this profile? [y/N]: ").strip().lower()
+        if bssid_choice == 'y':
+            bssid = generate_bssid(profile_index + 1)
+            os.environ["BSSID"] = bssid
+            log_event(f"Set custom BSSID: {bssid}")
+
+        log_event(f"Launched AP profile: {title} with args {args}")
+
+        # Launch the AP script
+        run_bash_script(
+            "utilities/start-ap",
+            args=args,
+            capture=False,
+            pause=profile["pause"],
+            clear=True, # Clear screen after prompts for cleaner script output
+            title=title
+        )
 
 def service_control():
     """
@@ -585,26 +575,64 @@ def service_control():
     """
 
     def show_dhcp_leases():
-        run_bash_script("services/show-ap-dhcp", pause=True, capture=True, clear=False, title="DHCP Lease Table")
+        # Corrected to call the right script and to clear the screen.
+        run_bash_script("services/show-ap-dhcp", pause=True, capture=True, clear=True, title="DHCP Lease Table")
 
     def show_connected_stations():
-        run_bash_script("services/show-ap-stations", pause=True, capture=True, clear=False, title="Connected Stations")
+        # Corrected to clear the screen.
+        run_bash_script("services/show-ap-stations", pause=True, capture=True, clear=True, title="Connected Stations")
+
+    def show_session_log():
+        """Displays the content of the session log file."""
+        ui_header("Session Log")
+        print()
+        if os.path.exists(LOG_FILE):
+            try:
+                with open(LOG_FILE, "r") as f:
+                    log_content = f.read().strip()
+                    if log_content:
+                        print(log_content)
+                    else:
+                        print(colour("[i] Session log is empty.", "info"))
+            except Exception as e:
+                print(colour(f"[x] Error reading log file: {e}", "warning"))
+        else:
+            print(colour("[!] Session log file not found.", "warning"))
+        input("\n[Press Enter to return to menu]")
+
+    def archive_session_log():
+        """Archives the current session log by renaming it with a timestamp."""
+        ui_header("Archive Session Log")
+        print()
+        if not os.path.exists(LOG_FILE):
+            print(colour("[!] No session log found to archive.", "warning"))
+        else:
+            try:
+                # Construct the new filename
+                log_dir = os.path.dirname(LOG_FILE)
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                archive_filename = f"wapt_session_{timestamp}.log"
+                archive_path = os.path.join(log_dir, archive_filename)
+
+                # Rename the file
+                os.rename(LOG_FILE, archive_path)
+
+                # Log the event to the *new* log file that will be created
+                log_event(f"Previous log archived to {archive_filename}")
+                print(colour("[+] Session log successfully archived to:", "success"))
+                print(f"  {archive_path}")
+
+            except OSError as e:
+                error_msg = f"Failed to archive log file: {e}"
+                print(colour(f"[x] {error_msg}", "warning"))
+                log_event(f"ERROR: {error_msg}")
+
+        input("\n[Press Enter to return to menu]")
 
     def interface_state():
         """
         Interface State submenu.
         """
-
-        def set_interface_down():
-            run_bash_script("services/set-interface-down", pause=False, capture=False, clear=False, title="Change Interface State")
-
-        def set_interface_up():
-            run_bash_script("services/set-interface-up", pause=False, capture=False, clear=False, title="Change Interface State")
-
-        actions = {
-            "1": set_interface_down,
-            "2": set_interface_up
-        }
 
         while True:
             ui_clear_screen()
@@ -620,13 +648,16 @@ def service_control():
             # Input
             choice = input(f"\n[{colour('?', 'header')}] Select an option: ")
 
-            if choice == "0":
-                break
-
-            action = actions.get(choice)
-            if action:
+            if choice == "1":
+                log_event("Interface State: Action 'Set Down'")
                 print()
-                action()
+                run_bash_script("services/interface-ctl", args=["down"], pause=True, capture=False, clear=False, title="Change Interface State")
+            elif choice == "2":
+                log_event("Interface State: Action 'Set Up'")
+                print()
+                run_bash_script("services/interface-ctl", args=["up"], pause=True, capture=False, clear=False, title="Change Interface State")
+            elif choice == "0":
+                break
             else:
                 ui_pause_on_invalid()
 
@@ -634,17 +665,6 @@ def service_control():
         """
         Interface mode submenu.
         """
-
-        def switch_to_managed():
-            run_bash_script("services/set-mode-managed", pause=False, capture=False, clear=False, title="Change Interface Mode")
-
-        def switch_to_monitor():
-            run_bash_script("services/set-mode-monitor", pause=False, capture=False, clear=False, title="Change Interface Mode")
-
-        actions = {
-            "1": switch_to_managed,
-            "2": switch_to_monitor
-        }
 
         while True:
             ui_clear_screen()
@@ -660,13 +680,16 @@ def service_control():
             # Input
             choice = input(f"\n[{colour('?', 'header')}] Select an option: ")
 
-            if choice == "0":
-                break
-
-            action = actions.get(choice)
-            if action:
+            if choice == "1":
+                log_event("Interface Mode: Action 'Set to Managed'")
                 print()
-                action()
+                run_bash_script("services/interface-ctl", args=["mode", "managed"], pause=False, capture=False, clear=False, title="Change Interface Mode")
+            elif choice == "2":
+                log_event("Interface Mode: Action 'Set to Monitor'")
+                print()
+                run_bash_script("services/interface-ctl", args=["mode", "monitor"], pause=False, capture=False, clear=False, title="Change Interface Mode")
+            elif choice == "0":
+                break
             else:
                 ui_pause_on_invalid()
 
@@ -674,17 +697,6 @@ def service_control():
         """
         Reset interface submenu.
         """
-
-        def perform_soft_reset():
-            run_bash_script("services/reset-interface-soft", pause=False, capture=False, clear=False, title="Reset Interface (Soft)")
-
-        def perform_hard_reset():
-            run_bash_script("services/reset-interface-hard", pause=False, capture=False, clear=False, title="Reset Interface (Hard)")
-
-        actions = {
-            "1": perform_soft_reset,
-            "2": perform_hard_reset
-        }
 
         while True:
             ui_clear_screen()
@@ -700,23 +712,18 @@ def service_control():
             # Input
             choice = input(f"\n[{colour('?', 'header')}] Select an option: ")
 
-            if choice == "0":
-                break
-
-            action = actions.get(choice)
-            if action:
+            if choice == "1":
+                log_event("Reset Interface: Action 'Soft Reset'")
                 print()
-                action()
+                run_bash_script("services/interface-ctl", args=["reset", "soft"], pause=False, capture=False, clear=False, title="Reset Interface (Soft)")
+            elif choice == "2":
+                log_event("Reset Interface: Action 'Hard Reset'")
+                print()
+                run_bash_script("services/interface-ctl", args=["reset", "hard"], pause=False, capture=False, clear=False, title="Reset Interface (Hard)")
+            elif choice == "0":
+                break
             else:
                 ui_pause_on_invalid()
-
-    actions = {
-        "1": interface_state,
-        "2": interface_mode,
-        "3": interface_reset,
-        "4": show_dhcp_leases,
-        "5": show_connected_stations
-    }
 
     while True:
         ui_clear_screen()
@@ -730,18 +737,40 @@ def service_control():
         print("[3] Reset Interface")
         print("[4] Show DHCP Leases")
         print("[5] Show Connected Stations")
+        print("[6] Show Session Log")
+        print("[7] Archive Session Log")
         print("\n[0] Return to Main Menu")
 
         # Input
         choice = input(f"\n[{colour('?', 'header')}] Select an option: ")
 
-        if choice == "0":
-            break
-
-        action = actions.get(choice)
-        if action:
+        if choice == "1":
+            log_event("Service Control: Selected 'Interface State'")
             ui_clear_screen()
-            action()
+            interface_state()
+        elif choice == "2":
+            log_event("Service Control: Selected 'Interface Mode'")
+            ui_clear_screen()
+            interface_mode()
+        elif choice == "3":
+            log_event("Service Control: Selected 'Reset Interface'")
+            ui_clear_screen()
+            interface_reset()
+        elif choice == "4":
+            log_event("Service Control: Selected 'Show DHCP Leases'")
+            show_dhcp_leases()
+        elif choice == "5":
+            log_event("Service Control: Selected 'Show Connected Stations'")
+            show_connected_stations()
+        elif choice == "6":
+            log_event("Service Control: Selected 'Show Session Log'")
+            show_session_log()
+        elif choice == "7":
+            log_event("Service Control: Selected 'Archive Session Log'")
+            ui_clear_screen()
+            archive_session_log()
+        elif choice == "0":
+            break
         else:
             ui_pause_on_invalid()
 
@@ -823,10 +852,63 @@ def theme_menu():
             log_event(f"Theme menu: Invalid option '{choice}'")
             ui_pause_on_invalid()
 
+def check_dependencies():
+    """
+    Checks for required system dependencies by running a helper script.
+    Exits gracefully if any dependency is missing.
+    """
+    ui_clear_screen()
+    print(colour("Checking system dependencies...", "info"))
+
+    # envsubst (from gettext) is critical for config templating
+    dependencies = ["hostapd", "dnsmasq", "iptables", "envsubst"]
+    base_path = Path(__file__).parent.parent / "bash"
+    script_path = (base_path / "utilities" / "check-deps.sh").resolve()
+
+    if not script_path.is_file():
+        print(colour("\n[x] Dependency checker script not found. Cannot continue.", "warning"))
+        sys.exit(1)
+
+    try:
+        cmd = ["bash", str(script_path)] + dependencies
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        print(colour("[+] All dependencies are met.", "success"))
+        time.sleep(1)
+    except subprocess.CalledProcessError as e:
+        print(colour("\n[!] Dependency check failed. The following packages are required:", "warning"))
+        print(e.stderr.strip())
+        print(colour("\nPlease install the missing packages and try again.", "warning"))
+        sys.exit(1)
+    except Exception as e:
+        print(colour(f"\n[x] An unexpected error occurred during dependency check: {e}", "warning"))
+        sys.exit(1)
+
+def cleanup_temp_files():
+    """
+    Remove all temporary files created by the toolkit to ensure a clean state.
+    """
+    print(colour("\n[~] Cleaning up temporary files...", "neutral"))
+    log_event("Action: Cleaning up temporary files")
+
+    temp_files = [
+        AP_ACTIVE_FILE,
+        "/tmp/wapt_http_server.pid",
+        "/tmp/hostapd.conf"
+    ]
+
+    for f_path in temp_files:
+        try:
+            if os.path.exists(f_path):
+                os.remove(f_path)
+                log_event(f"Removed temp file: {f_path}")
+        except OSError as e:
+            log_event(f"ERROR: Failed to remove temp file {f_path}: {e}")
+
 def main():
     """
     Main user input handler and application loop. Handles menu navigation, logging, and error handling.
     """
+    check_dependencies()
     log_event("Session started")
     try:
         while True:
@@ -845,9 +927,10 @@ def main():
                 log_event("Main menu: Selected 'Help | About'")
                 help_about()
             elif choice == "0":
-                if os.path.exists("/tmp/wapt_ap_active"):
+                if os.path.exists(AP_ACTIVE_FILE):
                     print(colour("\n[!] Stopping running access point", "warning"))
-                    run_bash_script("stop-ap", pause=False, capture=False, clear=False)
+                    run_bash_script("utilities/stop-ap", pause=False, capture=False, clear=False)
+                cleanup_temp_files()
                 print(colour("\n[+] Exiting to shell.", "warning"))
                 log_event("Session ended")
                 break
@@ -855,9 +938,14 @@ def main():
                 log_event(f"Main menu: Invalid option '{choice}'")
                 ui_pause_on_invalid()
     except KeyboardInterrupt:
+        if os.path.exists(AP_ACTIVE_FILE):
+            print(colour("\n[!] Stopping running access point due to user interrupt...", "warning"))
+            run_bash_script("utilities/stop-ap", pause=False, capture=False, clear=False)
+        cleanup_temp_files()
         print(colour("\n[!] Session interrupted by user.", "warning"))
         log_event("Session interrupted by user (KeyboardInterrupt)")
     except Exception as e:
+        cleanup_temp_files()
         print(colour("[x] An unexpected error occurred. See log for details.", "warning"))
         log_event(f"UNEXPECTED ERROR: {str(e)}")
 
