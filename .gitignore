@@ -1,4 +1,5 @@
 /archive/
+.vscode/
 __pycache__
 *.pcap
 backup_wapt.sh
