@@ -2,6 +2,8 @@
 
 A modular, accessible command-line toolkit for launching simulated wireless access points to support wireless threat simulations and cyber security research.
 
+## NOTE: This Repo supported a final year university project is now archived and no longer maintained ##
+
 ## Table of Contents
 - [Features](#features)
 - [Accessibility & Inclusivity](#accessibility--inclusivity)
