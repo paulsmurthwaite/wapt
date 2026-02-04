@@ -22,9 +22,6 @@ WAPT is a modular toolkit designed to launch simulated wireless access points. I
 ### Wireless Access Point Toolkit (WAPT)
 A modular, accessible command-line toolkit for launching simulated wireless access points to support wireless threat simulations and cyber security research.
 
-### Table of Contents
-- [Changelog](#changelog)
-
 ### Features
 - Scenario-aligned AP profiles for 13 WATT threats (e.g. Evil Twin, Open Rogue, Misconfigured)
 - Fully automated AP launch with no operator input required
