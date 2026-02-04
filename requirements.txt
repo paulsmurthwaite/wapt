@@ -1,7 +1,0 @@
-click
-scapy
-pyshark
-pandas
-fpdf2
-rich
-pytest
